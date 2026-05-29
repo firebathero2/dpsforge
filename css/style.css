@@ -98,7 +98,7 @@ body::before {
 
 .hud-summary {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -137,6 +137,26 @@ body::before {
 
 .header .resource-value {
   font-size: 1.55em;
+}
+
+.resource-item-progress .resource-value-stack {
+  display: block;
+  width: 100%;
+  gap: 2px;
+  line-height: 1.1;
+  white-space: normal;
+}
+
+.resource-item-progress .progress-level {
+  display: block;
+  font-size: 1em;
+  font-weight: 700;
+}
+
+.resource-item-progress .progress-exp {
+  display: block;
+  font-size: 0.84em;
+  color: #cbd5e1;
 }
 
 .header h1 {
@@ -1491,23 +1511,37 @@ body::before {
   .status-resource-display {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .hud-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
   .main-content {
     flex-direction: column;
+    gap: 16px;
   }
 
   .sidebar {
     width: 100%;
     flex-basis: auto;
-    position: static;
     flex-direction: row;
+    position: sticky;
+    top: 10px;
+    z-index: 1200;
+    padding: 8px;
+    background: rgba(2, 6, 23, 0.86);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
   }
 
   .sidebar-link {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 88px;
     text-align: center;
+    padding: 12px 10px;
+    font-size: 0.88em;
   }
 
   .content-panels {
@@ -1515,58 +1549,73 @@ body::before {
   }
 
   .hud-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .status-resource-display {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 768px) {
   .container {
-    padding: 12px;
+    padding: 10px;
   }
 
-  .battle-stage {
-    height: 220px;
+  .main-content {
+    gap: 14px;
   }
 
-  .battle-stage-target {
-    width: 176px;
-    height: 176px;
-  }
-
-  .battle-stage-unit {
-    width: 46px;
-    height: 28px;
-  }
-
-  .unit-table {
-    font-size: 0.8em;
-  }
-  
-  .unit-table th,
-  .unit-table td {
-    padding: 6px;
-  }
-  
   .header {
-    padding: 18px;
-  }
-  
-  .header h1 {
-    font-size: 1.8em;
+    padding: 12px;
+    margin-bottom: 14px;
   }
 
-  .sidebar {
+  .hud-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
   }
 
-  .sidebar-link {
-    padding: 12px 10px;
-    font-size: 0.9em;
+  .header .resource-item {
+    min-height: 54px;
+    padding: 8px 10px;
+    gap: 4px;
   }
 
-  .panel-tab {
-    flex: 1;
-    text-align: center;
+  .header .resource-label {
+    font-size: 0.7em;
+    letter-spacing: 0.08em;
+  }
+
+  .header .resource-value {
+    font-size: 1.08em;
+  }
+
+  .resource-item-progress .progress-level {
+    font-size: 0.98em;
+  }
+
+  .resource-item-progress .progress-exp {
+    font-size: 0.76em;
+  }
+
+  .section {
+    padding: 12px;
+  }
+
+  .section h2::before {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .resource-display {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .status-resource-display {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .resource-item,
@@ -1575,25 +1624,199 @@ body::before {
     border-radius: 10px;
   }
 
-  .section {
-    padding: 16px;
+  .sidebar {
+    gap: 6px;
+    top: 8px;
+    padding: 6px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
 
-  .section h2::before {
+  .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .sidebar-link {
+    flex: 0 0 auto;
+    min-width: 88px;
+    padding: 10px 8px;
+    font-size: 0.82em;
+  }
+
+  .panel-tabs {
+    gap: 8px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .panel-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .battle-stage {
+    height: 186px;
+  }
+
+  .battle-stage-target {
+    width: 142px;
+    height: 142px;
+  }
+
+  .battle-stage-unit {
+    width: 40px;
+    height: 24px;
+  }
+
+  .unit-table {
     display: block;
-    margin-bottom: 4px;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    font-size: 0.8em;
+  }
+  
+  .unit-table thead {
+    display: none;
   }
 
-  .hud-summary {
+  .unit-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .unit-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(6, 182, 212, 0.18);
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
+    box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.06);
+  }
+
+  .unit-table tbody tr td {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 0;
+    border: none;
+    min-width: 0;
+  }
+
+  .unit-table tbody tr td::before {
+    font-size: 0.7em;
+    color: var(--muted-color);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.92;
+    content: attr(data-label);
+  }
+
+  #inventory-container .unit-table tbody tr td:nth-child(1)::before { content: '단계'; }
+  #inventory-container .unit-table tbody tr td:nth-child(2)::before { content: 'DPS'; }
+  #inventory-container .unit-table tbody tr td:nth-child(3)::before { content: '인벤토리'; }
+  #inventory-container .unit-table tbody tr td:nth-child(4)::before { content: '구매'; }
+  #inventory-container .unit-table tbody tr td:nth-child(5)::before { content: '배치'; }
+  #inventory-container .unit-table tbody tr td:nth-child(6)::before { content: '강화확률'; }
+  #inventory-container .unit-table tbody tr td:nth-child(7)::before { content: '강화'; }
+  #inventory-container .unit-table tbody tr td:nth-child(8)::before { content: '판매'; }
+
+  #deployed-container .unit-table tbody tr td:nth-child(1)::before { content: '단계'; }
+  #deployed-container .unit-table tbody tr td:nth-child(2)::before { content: '공격력'; }
+  #deployed-container .unit-table tbody tr td:nth-child(3)::before { content: '속도'; }
+  #deployed-container .unit-table tbody tr td:nth-child(4)::before { content: 'DPS'; }
+  #deployed-container .unit-table tbody tr td:nth-child(5)::before { content: '배치됨'; }
+  #deployed-container .unit-table tbody tr td:nth-child(6)::before { content: 'DPS 기여도'; }
+  #deployed-container .unit-table tbody tr td:nth-child(7)::before { content: '액션'; }
+
+  .upgrade-probability-cell {
+    min-width: 0;
+  }
+
+  .sell-actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sell-actions .btn-sm,
+  .unit-table .btn-sm,
+  .actions .btn,
+  .actions .btn-sm {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions .btn {
+    min-width: 0;
+  }
+
+  .panel-tab {
+    flex: 0 0 auto;
+    min-width: 98px;
+    text-align: center;
+  }
+
+  .midboss-clone-list {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+  }
+
+  .price-tooltip-text {
+    left: auto;
+    right: 0;
+    transform: none;
+    min-width: min(240px, calc(100vw - 44px));
+    max-width: calc(100vw - 44px);
+  }
+
+  .tutorial-overlay {
+    bottom: 12px;
+  }
+
+  .tutorial-panel {
+    width: min(94vw, 420px);
+  }
+
+  .midboss-gauge-head,
+  .midboss-gauge-foot {
+    font-size: 0.86em;
+  }
+}
+
+@media (max-width: 480px) {
+  .hud-summary,
+  .resource-display,
+  .status-resource-display {
     grid-template-columns: 1fr;
   }
 
   .header .resource-item {
-    min-height: 68px;
+    min-height: 50px;
   }
 
-  .status-resource-display {
+  .unit-table tbody tr {
     grid-template-columns: 1fr;
+  }
+
+  .sidebar-link {
+    min-width: 74px;
+    font-size: 0.76em;
+  }
+
+  .panel-tab {
+    min-width: 86px;
   }
 }
 

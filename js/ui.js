@@ -1246,16 +1246,10 @@ class GameUI {
       earnedEl.textContent = this.formatAbcNumber(state.totalGoldEarned);
     }
 
-    this.updateHudValue('character-level', state.characterLevel);
-
-    // 캐릭터 경험치
-    const expEl = document.getElementById('character-exp');
-    if (expEl) {
-      const nextExpText = state.requiredExpForNextLevel === 0
-        ? 'MAX'
-        : `${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)}`;
-      this.updateHudValue('character-exp', nextExpText);
-    }
+    const characterProgressText = state.requiredExpForNextLevel === 0
+      ? `Lv ${this.formatAbcNumber(state.characterLevel)} | MAX`
+      : `Lv ${this.formatAbcNumber(state.characterLevel)} | ${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)}`;
+    this.updateHudValue('character-progress', characterProgressText);
 
     this.updateHudValue('trait-points', state.traitPoints);
     this.updateHudValue('midboss-level', state.midBoss?.level || 0);

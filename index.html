@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DPS Forge - Idle Game</title>
-  <link rel="stylesheet" href="css/style.css?v=20260529-04">
+  <link rel="stylesheet" href="css/style.css?v=20260529-07">
 </head>
 <body>
   <div class="container">
@@ -19,13 +19,12 @@
           <span class="resource-label">골드</span>
           <span class="resource-value" id="gold-display">0</span>
         </div>
-        <div class="resource-item">
-          <span class="resource-label">레벨</span>
-          <span class="resource-value" id="character-level">1</span>
-        </div>
-        <div class="resource-item">
-          <span class="resource-label">경험치</span>
-          <span class="resource-value" id="character-exp">0 / 5</span>
+        <div class="resource-item resource-item-progress">
+          <span class="resource-label">레벨 / 경험치</span>
+          <span class="resource-value resource-value-stack" id="character-progress">
+            <span class="progress-level">Lv 1</span>
+            <span class="progress-exp">0 / 5</span>
+          </span>
         </div>
         <div class="resource-item">
           <span class="resource-label">특성 포인트</span>
@@ -706,8 +705,6 @@
 
     <!-- 푸터 -->
     <footer class="footer">
-      <p>DPS Forge v0.1</p>
-      <p>페이지를 닫을 때 자동 저장됩니다.</p>
     </footer>
   </div>
 
