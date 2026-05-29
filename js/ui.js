@@ -639,6 +639,10 @@ class GameUI {
   }
 
   canPerformSecondRebirth(state) {
+    if (!this.firstRebirthCompleted) {
+      return false;
+    }
+
     const level = Math.max(1, Math.floor(Number(state?.characterLevel) || 1));
     const inventoryCount = Math.max(0, Math.floor(Number(state?.inventory?.[20]) || 0));
     const deployedCount = Math.max(0, Math.floor(Number(state?.deployed?.[20]) || 0));
@@ -661,7 +665,9 @@ class GameUI {
     }
 
     if (secondBtn) {
-      secondBtn.title = '조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금';
+      secondBtn.title = this.firstRebirthCompleted
+        ? '조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금'
+        : '선행 조건 : 1차 환생 완료';
       if (this.secondRebirthCompleted) {
         secondBtn.hidden = true;
       } else {
@@ -708,6 +714,11 @@ class GameUI {
   onPerformSecondRebirthUnlock() {
     const state = gameEngine.getState();
     if (this.secondRebirthCompleted) {
+      return;
+    }
+
+    if (!this.firstRebirthCompleted) {
+      alert('2차 환생은 1차 환생 완료 후 활성화됩니다.');
       return;
     }
 
@@ -1506,8 +1517,10 @@ class GameUI {
     }
 
     const canRecover = Boolean(state.emergencyRecoveryAvailable);
+    const recoveryGold = Math.max(1, Math.floor(Number(gameEngine.getEmergencyRecoveryGold?.()) || 0));
     panelEl.classList.toggle('active', canRecover);
     buttonEl.disabled = !canRecover;
+    buttonEl.textContent = `긴급 복구 (${this.formatAbcNumber(recoveryGold)}골드 지급)`;
   }
 
   /**
@@ -3113,7 +3126,7 @@ class GameUI {
   }
 
   /**
-   * 소프트락 복구: 10골드 지급
+   * 소프트락 복구: 최소 1단 구매 가능 골드 지급
    */
   onEmergencyRecovery() {
     const result = gameEngine.applyEmergencyRecovery();

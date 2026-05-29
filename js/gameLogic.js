@@ -264,7 +264,18 @@ class GameEngine {
   }
 
   /**
-   * 소프트락 복구: 10골드 지급
+   * 소프트락 복구 지급 골드
+   * 기본값은 초보자 버프 총합(지급량*지속시간)으로 계산한다.
+   */
+  getEmergencyRecoveryGold() {
+    const beginnerRate = Math.max(0, Number(GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_RATE_PER_SEC) || 0);
+    const beginnerDuration = Math.max(0, Number(GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_DURATION_SEC) || 0);
+    const beginnerTotal = Math.floor(beginnerRate * beginnerDuration);
+    return Math.max(0, beginnerTotal);
+  }
+
+  /**
+   * 소프트락 복구: 최소 1단 구매 가능 골드 지급
    */
   applyEmergencyRecovery() {
     if (!this.canUseEmergencyRecovery()) {
@@ -275,7 +286,7 @@ class GameEngine {
       };
     }
 
-    const gainedGold = 10;
+    const gainedGold = this.getEmergencyRecoveryGold();
     this.state.gold += gainedGold;
     this.state.totalGoldEarned += gainedGold;
 
@@ -679,6 +690,11 @@ class GameEngine {
     freshState.traitPoints = preservedTraitPoints;
     freshState.traitLevels = preservedTraitLevels;
     freshState.tutorial = preservedTutorial;
+    // 환생 직후에도 초보자 골드 버프는 다시 시작되도록 보장
+    freshState.tutorial.beginnerBuffActive = true;
+    freshState.tutorial.beginnerBuffElapsedSec = 0;
+    freshState.tutorial.beginnerBuffDurationSec = GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_DURATION_SEC;
+    freshState.tutorial.beginnerBuffRatePerSec = GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_RATE_PER_SEC;
     freshState.totalPlayTimeSeconds = preservedTotalPlayTime;
     freshState.totalScaledPlayTimeSeconds = preservedTotalScaledPlayTime;
 
@@ -973,6 +989,22 @@ class GameEngine {
               : { ...initialState.tutorial, enabled: false, completed: true, beginnerBuffActive: false })
           }
         };
+
+        const mergedGold = Math.max(0, Math.floor(Number(mergedState.gold) || 0));
+        const mergedInventoryCount = Object.values(mergedState.inventory || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
+        const mergedDeployedCount = Object.values(mergedState.deployed || {}).reduce((sum, count) => sum + (Number(count) || 0), 0);
+        const tutorialState = mergedState.tutorial || {};
+        const buffElapsed = Math.max(0, Number(tutorialState.beginnerBuffElapsedSec) || 0);
+        const buffDuration = Math.max(0, Number(tutorialState.beginnerBuffDurationSec) || 0);
+        const buffRate = Math.max(0, Number(tutorialState.beginnerBuffRatePerSec) || 0);
+        const hasTutorialIncome = Boolean(tutorialState.beginnerBuffActive) && buffRate > 0 && buffElapsed < buffDuration;
+        const isHardSoftLocked = mergedGold === 0 && mergedInventoryCount === 0 && mergedDeployedCount === 0 && !hasTutorialIncome;
+
+        if (isHardSoftLocked) {
+          const rescueGold = this.getEmergencyRecoveryGold();
+          mergedState.gold += rescueGold;
+          mergedState.totalGoldEarned += rescueGold;
+        }
 
         this.autoSaveSuspended = true;
         this.observableProxyCache = new WeakMap();
