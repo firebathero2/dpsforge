@@ -149,6 +149,39 @@ const GAME_CONSTANTS = {
   // 자동화 기본 속도 (초당 시도 횟수)
   AUTO_BASE_ACTIONS_PER_SEC: 25,
 
+  // 환생 시스템 (현재는 기능 비활성 유지)
+  REBIRTH_ENABLED: false,
+  REBIRTH_TEMP_DISABLED_MESSAGE: '환생 시스템은 현재 비활성화 상태입니다. 추후 업데이트에서 다시 오픈될 예정입니다.',
+  REBIRTH_UNLOCK_TIER: 10,
+  REBIRTH_POINT_NAME: '환생 포인트',
+  REBIRTH_REWARDS: {
+    automationStartPass: {
+      name: '자동화 개시 패스',
+      maxLevel: 5,
+      costs: [1, 2, 3, 5, 8]
+    },
+    trainingManual: {
+      name: '훈련 교본',
+      maxLevel: 5,
+      costs: [1, 2, 4, 6, 10]
+    },
+    breakthroughMemory: {
+      name: '돌파 기억',
+      maxLevel: 5,
+      costs: [1, 4, 7, 10, 13]
+    },
+    vanguardGrant: {
+      name: '선발대 지급',
+      maxLevel: 5,
+      costs: [1, 2, 4, 7, 11]
+    },
+    pioneerSlots: {
+      name: '개척자 슬롯',
+      maxLevel: 5,
+      costs: [1, 3, 5, 8, 13]
+    }
+  },
+
 
   // 판매 경험치 (15단부터 판매 가능)
   SELL_EXP_BY_TIER: {
@@ -290,6 +323,31 @@ const GAME_CONSTANTS = {
     return this.SELL_EXP_BY_TIER[tier] || 0;
   },
 
+  // 환생 시 획득 환생 포인트 계산
+  getRebirthPointsFromTier(maxTierReached) {
+    const tier = Math.max(1, Math.floor(Number(maxTierReached) || 1));
+    if (tier < this.REBIRTH_UNLOCK_TIER) {
+      return 0;
+    }
+    return Math.max(0, tier - this.REBIRTH_UNLOCK_TIER + 1);
+  },
+
+  // 환생 보상 다음 레벨 비용
+  getRebirthRewardCost(rewardKey, currentLevel) {
+    const rewardMeta = this.REBIRTH_REWARDS?.[rewardKey];
+    if (!rewardMeta) {
+      return null;
+    }
+
+    const level = Math.max(0, Math.floor(Number(currentLevel) || 0));
+    if (level >= rewardMeta.maxLevel) {
+      return null;
+    }
+
+    const costs = rewardMeta.costs || [];
+    return Number.isFinite(costs[level]) ? costs[level] : null;
+  },
+
   // 중간보스 레벨별 DPS 컷
   getMidBossDpsCut(level) {
     const normalizedLevel = Math.max(0, Math.floor(level));
@@ -345,6 +403,21 @@ function initGameState() {
     midBoss: {
       level: 0,
       lastResult: null
+    },
+    rebirth: {
+      points: 0,
+      totalRebirthCount: 0,
+      cumulativePointsEarned: 0,
+      highestTierReached: 1,
+      lastRebirthTier: 1,
+      bestTierReached: 1,
+      rewards: {
+        automationStartPass: 0,
+        trainingManual: 0,
+        breakthroughMemory: 0,
+        vanguardGrant: 0,
+        pioneerSlots: 0
+      }
     },
     tutorial: {
       enabled: true,

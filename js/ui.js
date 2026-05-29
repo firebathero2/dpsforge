@@ -683,10 +683,25 @@ class GameUI {
       return;
     }
 
+    const confirmed = confirm('1차 환생을 진행하면 현재 런 진행값이 초기화됩니다.\n계속하시겠습니까?');
+    if (!confirmed) {
+      return;
+    }
+
     this.firstRebirthCompleted = true;
+    this.resetAllAutomationState();
+    const result = gameEngine.performMilestoneRebirth();
+    if (!result.success) {
+      this.firstRebirthCompleted = false;
+      alert(result.message || '1차 환생 처리 중 오류가 발생했습니다.');
+      return;
+    }
+
+    this.midBossRun = null;
     this.updateTimeScaleUi();
-    this.updateRebirthActionButtons(state);
+    this.updateRebirthActionButtons();
     this.saveAutomationState();
+    this.updateUI();
     alert('1차 환생 완료! 보상으로 2배속이 해금되었습니다.');
   }
 
@@ -701,10 +716,25 @@ class GameUI {
       return;
     }
 
+    const confirmed = confirm('2차 환생을 진행하면 현재 런 진행값이 초기화됩니다.\n계속하시겠습니까?');
+    if (!confirmed) {
+      return;
+    }
+
     this.secondRebirthCompleted = true;
+    this.resetAllAutomationState();
+    const result = gameEngine.performMilestoneRebirth();
+    if (!result.success) {
+      this.secondRebirthCompleted = false;
+      alert(result.message || '2차 환생 처리 중 오류가 발생했습니다.');
+      return;
+    }
+
+    this.midBossRun = null;
     this.updateTimeScaleUi();
-    this.updateRebirthActionButtons(state);
+    this.updateRebirthActionButtons();
     this.saveAutomationState();
+    this.updateUI();
     alert('2차 환생 완료! 보상으로 3배속이 해금되었습니다.');
   }
 
@@ -1427,8 +1457,9 @@ class GameUI {
       }
     ];
 
+    const rewardSystems = GAME_CONSTANTS.REBIRTH_REWARDS || {};
     for (const binding of bindings) {
-      const rewardMeta = GAME_CONSTANTS.REBIRTH_REWARDS[binding.key];
+      const rewardMeta = rewardSystems[binding.key];
       if (!rewardMeta) {
         continue;
       }

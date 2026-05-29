@@ -904,8 +904,9 @@ class GameEngine {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const { rebirth: _legacyRebirth, ...parsedWithoutRebirth } = parsed || {};
-        void _legacyRebirth;
+        const parsedRebirth = parsed?.rebirth;
+        const { rebirth: _unusedRebirth, ...parsedWithoutRebirth } = parsed || {};
+        void _unusedRebirth;
         const initialState = initGameState();
         const parsedTraitLevels = parsedWithoutRebirth.traitLevels || {};
         const {
@@ -957,6 +958,14 @@ class GameEngine {
           midBoss: {
             ...initialState.midBoss,
             ...(parsedWithoutRebirth.midBoss || {})
+          },
+          rebirth: {
+            ...initialState.rebirth,
+            ...(parsedRebirth && typeof parsedRebirth === 'object' ? parsedRebirth : {}),
+            rewards: {
+              ...initialState.rebirth.rewards,
+              ...(parsedRebirth?.rewards && typeof parsedRebirth.rewards === 'object' ? parsedRebirth.rewards : {})
+            }
           },
           tutorial: {
             ...(parsedWithoutRebirth && typeof parsedWithoutRebirth.tutorial === 'object'
