@@ -27,6 +27,7 @@ class GameUI {
     this.availableTimeScales = [1, 2, 3];
     this.firstRebirthCompleted = false;
     this.secondRebirthCompleted = false;
+    this.lastLoopTimestampMs = null;
     this.traitPresetNames = {
       1: '1',
       2: '2',
@@ -125,9 +126,14 @@ class GameUI {
    * 게임 루프 시작
    */
   startGameLoop() {
+    this.lastLoopTimestampMs = performance.now();
     this.gameLoopId = setInterval(() => {
-      const realDelta = GAME_CONSTANTS.TICK_INTERVAL;
-      const scaledDelta = GAME_CONSTANTS.TICK_INTERVAL * this.timeScale;
+      const nowMs = performance.now();
+      const elapsedRealSec = Math.max(0, (nowMs - (this.lastLoopTimestampMs || nowMs)) / 1000);
+      this.lastLoopTimestampMs = nowMs;
+
+      const realDelta = elapsedRealSec;
+      const scaledDelta = elapsedRealSec * this.timeScale;
       gameEngine.tick(scaledDelta, realDelta);
       this.runAutomation(scaledDelta);
       this.updateUI();
@@ -140,7 +146,9 @@ class GameUI {
   stopGameLoop() {
     if (this.gameLoopId) {
       clearInterval(this.gameLoopId);
+      this.gameLoopId = null;
     }
+    this.lastLoopTimestampMs = null;
   }
   
   /**
