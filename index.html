@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DPS Forge - Idle Game</title>
+  <link rel="stylesheet" href="css/style.css?v=20260529-04">
+</head>
+<body>
+  <div class="container">
+    <!-- 헤더 -->
+    <header class="header">
+      <div class="hud-summary">
+        <div class="resource-item hud-dps">
+          <span class="resource-label">DPS</span>
+          <span class="resource-value" id="dps-display">0.00</span>
+        </div>
+        <div class="resource-item hud-gold">
+          <span class="resource-label">골드</span>
+          <span class="resource-value" id="gold-display">0</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-label">레벨</span>
+          <span class="resource-value" id="character-level">1</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-label">경험치</span>
+          <span class="resource-value" id="character-exp">0 / 5</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-label">특성 포인트</span>
+          <span class="resource-value" id="trait-points">1</span>
+        </div>
+        <div class="resource-item">
+          <span class="resource-label">사냥터 인구</span>
+          <span class="resource-value" id="slot-population">0 / 10</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+      <aside class="sidebar" aria-label="주요 네비게이션">
+        <button class="sidebar-link active" data-panel="status-panel">상태</button>
+        <button class="sidebar-link" data-panel="battle-panel">전투</button>
+        <button class="sidebar-link" data-panel="management-panel">관리</button>
+        <button class="sidebar-link" data-panel="settings-panel">설정</button>
+      </aside>
+
+      <div class="content-panels">
+        <section class="section panel-content active" id="status-panel">
+          <h2>상태</h2>
+          <h3>캐릭터 성장</h3>
+          <div class="resource-display status-resource-display">
+            <div class="resource-item">
+              <span class="resource-label">수입 배율:</span>
+              <span class="resource-value" id="income-multiplier">x1</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">실제 수입:</span>
+              <span class="resource-value" id="actual-income">0.00/s</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">다음 배율:</span>
+              <span class="resource-value" id="next-multiplier">DPS 10</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">누적 획득:</span>
+              <span class="resource-value" id="total-earned">0</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">중간보스 레벨:</span>
+              <span class="resource-value" id="midboss-level">0</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">
+                자동화 수치:
+                <span class="price-tooltip" tabindex="0" aria-label="자동화 수치 안내">
+                  !
+                  <span class="price-tooltip-text">(구매, 강화, 판매속도)</span>
+                </span>
+              </span>
+              <span class="resource-value" id="status-automation-rate">각 25회/초</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">플레이시간:</span>
+              <span class="resource-value" id="play-time">00:00:00</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">누적 플레이시간:</span>
+              <span class="resource-value" id="total-play-time">00:00:00</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">배속 플레이시간:</span>
+              <span class="resource-value" id="scaled-play-time">00:00:00</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">누적 배속플레이시간:</span>
+              <span class="resource-value" id="total-scaled-play-time">00:00:00</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">환생 횟수:</span>
+              <span class="resource-value" id="status-rebirth-count">0회</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">최고도달단수:</span>
+              <span class="resource-value" id="status-last-rebirth-tier">1단</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn btn-reset" id="hard-reset-button">테스트 초기화</button>
+          </div>
+        </section>
+
+        <section class="section panel-content" id="battle-panel">
+          <h2>전투</h2>
+
+          <div class="panel-tabs" data-tab-group="battle">
+            <button class="panel-tab active" data-tab-group="battle" data-tab="battle-hunt-tab">사냥터</button>
+            <button class="panel-tab" data-tab-group="battle" data-tab="battle-midboss-tab">중간보스</button>
+          </div>
+
+          <div class="panel-tab-content active" data-tab-group-content="battle" id="battle-hunt-tab">
+            <div class="battle-stage" aria-hidden="true">
+              <div class="battle-stage-grid"></div>
+              <div class="battle-stage-scanline"></div>
+              <div class="battle-stage-orb battle-stage-orb-left"></div>
+              <div class="battle-stage-orb battle-stage-orb-right"></div>
+              <div class="battle-stage-combat">
+                <div class="battle-stage-units" id="battle-stage-units"></div>
+                <div class="battle-stage-target" id="battle-stage-target">
+                  <div class="battle-stage-target-ring battle-stage-target-ring-back"></div>
+                  <div class="battle-stage-target-core"></div>
+                  <div class="battle-stage-target-ring battle-stage-target-ring-front"></div>
+                </div>
+              </div>
+              <div class="battle-fx-layer" id="battle-fx-layer"></div>
+            </div>
+
+            <div class="slot-status">
+              배치 상태: <span id="slot-status">0/10</span>
+            </div>
+
+            <div class="deployed-container" id="deployed-container">
+              <table class="unit-table">
+                <thead>
+                  <tr>
+                    <th>단계</th>
+                    <th>공격력</th>
+                    <th>속도</th>
+                    <th>DPS</th>
+                    <th>배치됨</th>
+                    <th>DPS 기여도</th>
+                    <th>액션</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>1단</td>
+                    <td>1</td>
+                    <td>2초</td>
+                    <td>0.50</td>
+                    <td id="deployed-tier-1">0</td>
+                    <td id="deployed-dps-1">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-1">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>2단</td>
+                    <td>2</td>
+                    <td>2초</td>
+                    <td>1.00</td>
+                    <td id="deployed-tier-2">0</td>
+                    <td id="deployed-dps-2">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-2">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>3단</td>
+                    <td>4</td>
+                    <td>2초</td>
+                    <td>2.00</td>
+                    <td id="deployed-tier-3">0</td>
+                    <td id="deployed-dps-3">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-3">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>4단</td>
+                    <td>7</td>
+                    <td>2초</td>
+                    <td>3.50</td>
+                    <td id="deployed-tier-4">0</td>
+                    <td id="deployed-dps-4">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-4">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>5단</td>
+                    <td>12</td>
+                    <td>2초</td>
+                    <td>6.00</td>
+                    <td id="deployed-tier-5">0</td>
+                    <td id="deployed-dps-5">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-5">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>6단</td>
+                    <td>20</td>
+                    <td>2초</td>
+                    <td>10.00</td>
+                    <td id="deployed-tier-6">0</td>
+                    <td id="deployed-dps-6">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-6">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>7단</td>
+                    <td>32</td>
+                    <td>2초</td>
+                    <td>16.00</td>
+                    <td id="deployed-tier-7">0</td>
+                    <td id="deployed-dps-7">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-7">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>8단</td>
+                    <td>51</td>
+                    <td>2초</td>
+                    <td>25.50</td>
+                    <td id="deployed-tier-8">0</td>
+                    <td id="deployed-dps-8">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-8">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>9단</td>
+                    <td>81</td>
+                    <td>2초</td>
+                    <td>40.50</td>
+                    <td id="deployed-tier-9">0</td>
+                    <td id="deployed-dps-9">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-9">회수</button></td>
+                  </tr>
+                  <tr>
+                    <td>10단</td>
+                    <td>128</td>
+                    <td>2초</td>
+                    <td>64.00</td>
+                    <td id="deployed-tier-10">0</td>
+                    <td id="deployed-dps-10">-</td>
+                    <td><button class="btn-sm" id="retrieve-tier-10">회수</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="actions emergency-recovery-panel" id="emergency-recovery-panel">
+              <button class="btn" id="emergency-recovery-btn">긴급 복구 (10골드 지급)</button>
+            </div>
+          </div>
+
+          <div class="panel-tab-content" data-tab-group-content="battle" id="battle-midboss-tab">
+            <h3>중간보스 도전</h3>
+            <div class="resource-display">
+              <div class="resource-item">
+                <span class="resource-label">중간보스 레벨</span>
+                <span class="resource-value" id="midboss-current-level">0</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">현재 DPS 컷</span>
+                <span class="resource-value" id="midboss-dps-cut">10.00</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">클론 합산 DPS</span>
+                <span class="resource-value" id="midboss-clone-dps">0.00</span>
+              </div>
+            </div>
+
+            <div class="midboss-battle-card">
+              <div class="midboss-gauge-head">
+                <span>실시간 DPS: <strong id="midboss-live-dps">0.00</strong></span>
+                <span>3초 평균 DPS: <strong id="midboss-avg-dps">0.00</strong></span>
+              </div>
+              <div class="midboss-progress-track" aria-label="중간보스 진행률">
+                <div class="midboss-progress-fill" id="midboss-progress-fill"></div>
+              </div>
+              <div class="midboss-gauge-foot">
+                <span>진행 시간: <strong id="midboss-timer">0.0 / 3.0초</strong></span>
+                <span id="midboss-status-text">대기 중</span>
+              </div>
+            </div>
+
+            <div class="midboss-clone-list" id="midboss-clone-list"></div>
+
+            <div class="actions">
+              <button class="btn" id="midboss-start-btn">중간보스 도전</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="section panel-content" id="management-panel">
+          <h2>관리</h2>
+
+          <div class="panel-tabs" data-tab-group="management">
+            <button class="panel-tab active" data-tab-group="management" data-tab="units-tab">유닛 관리</button>
+            <button class="panel-tab" data-tab-group="management" data-tab="traits-tab">특성 관리</button>
+            <button class="panel-tab" data-tab-group="management" data-tab="rebirth-tab">환생관리(예정)</button>
+          </div>
+
+          <div class="panel-tab-content active" data-tab-group-content="management" id="units-tab">
+            <h3>인벤토리 & 강화</h3>
+            <div class="inventory-container" id="inventory-container">
+              <table class="unit-table">
+                <thead>
+                  <tr>
+                    <th>단계</th>
+                    <th>DPS</th>
+                    <th>인벤토리</th>
+                    <th>
+                      <span class="purchase-header">
+                        구매
+                        <span class="price-tooltip" id="purchase-price-tooltip" tabindex="0" aria-label="구매 가격 안내">
+                          i
+                          <span class="price-tooltip-text" id="purchase-price-tooltip-text"></span>
+                        </span>
+                      </span>
+                    </th>
+                    <th>배치</th>
+                    <th>강화확률</th>
+                    <th>강화</th>
+                    <th>판매</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>1단</td>
+                    <td>1</td>
+                    <td id="inventory-tier-1-count">0</td>
+                    <td><button class="btn-sm" id="auto-buy-toggle">자동구매 OFF</button></td>
+                    <td><button class="btn-sm" id="deploy-tier-1">배치</button></td>
+                    <td>30%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-1">강화</button></td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>2단</td>
+                    <td>2</td>
+                    <td id="inventory-tier-2-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-2">배치</button></td>
+                    <td>27%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-2">강화</button></td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>3단</td>
+                    <td>4</td>
+                    <td id="inventory-tier-3-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-3">배치</button></td>
+                    <td>24%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-3">강화</button></td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>4단</td>
+                    <td>7</td>
+                    <td id="inventory-tier-4-count">0</td>
+                    <td><button class="btn-sm" id="auto-buy-tier-4-toggle">자동구매 OFF</button></td>
+                    <td><button class="btn-sm" id="deploy-tier-4">배치</button></td>
+                    <td>21%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-4">강화</button></td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>5단</td>
+                    <td>12</td>
+                    <td id="inventory-tier-5-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-5">배치</button></td>
+                    <td>18%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-5">강화</button></td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-5">판매(+1EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-5">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>6단</td>
+                    <td>20</td>
+                    <td id="inventory-tier-6-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-6">배치</button></td>
+                    <td>15%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-6">강화</button></td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-6">판매(+3EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-6">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>7단</td>
+                    <td>32</td>
+                    <td id="inventory-tier-7-count">0</td>
+                    <td><button class="btn-sm" id="auto-buy-tier-7-toggle">자동구매 OFF</button></td>
+                    <td><button class="btn-sm" id="deploy-tier-7">배치</button></td>
+                    <td>12%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-7">강화</button></td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-7">판매(+9EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-7">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>8단</td>
+                    <td>51</td>
+                    <td id="inventory-tier-8-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-8">배치</button></td>
+                    <td>9%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-8">강화</button></td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-8">판매(+27EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-8">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>9단</td>
+                    <td>81</td>
+                    <td id="inventory-tier-9-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-9">배치</button></td>
+                    <td>6%</td>
+                    <td><button class="btn-sm" id="upgrade-tier-9">강화</button></td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-9">판매(+90EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-9">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>10단</td>
+                    <td>128</td>
+                    <td id="inventory-tier-10-count">0</td>
+                    <td>-</td>
+                    <td><button class="btn-sm" id="deploy-tier-10">배치</button></td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>
+                      <div class="sell-actions">
+                        <button type="button" class="btn-sm btn-sell" id="sell-tier-10">판매(+320EXP)</button>
+                        <button type="button" class="btn-sm btn-auto-sell" id="auto-sell-tier-10">자동판매 OFF</button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel-tab-content" data-tab-group-content="management" id="traits-tab">
+            <h3>특성 관리</h3>
+            <div class="trait-preset-panel" id="trait-preset-panel">
+              <div class="trait-preset-title">특성 프리셋</div>
+              <div class="trait-preset-buttons" id="trait-preset-buttons">
+                <button type="button" class="btn-sm" data-trait-preset="1">1</button>
+                <button type="button" class="btn-sm" data-trait-preset="2">2</button>
+                <button type="button" class="btn-sm" data-trait-preset="3">3</button>
+                <button type="button" class="btn-sm" data-trait-preset="4">4</button>
+                <button type="button" class="btn-sm" data-trait-preset="5">5</button>
+              </div>
+              <div class="trait-preset-actions">
+                <button type="button" class="btn-sm" id="save-trait-preset">현재 프리셋 저장</button>
+                <button type="button" class="btn-sm" id="rename-trait-preset">이름변경</button>
+              </div>
+            </div>
+            <div class="trait-panel">
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-attack-name">공격력 업글</span>
+                  <span class="trait-level" id="trait-attack-level">0/100Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-attack-cost">비용: 2P</span>
+                  <span class="trait-effect" id="trait-attack-effect">배수: ×1.00<span class="trait-preview">(+0.10)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-attack-power">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-attack-power">리셋</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-enhance-plus1-name">+1강 강화확률 증가</span>
+                  <span class="trait-level" id="trait-enhance-plus1-level">0/100Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-enhance-plus1-cost">비용: 1P</span>
+                  <span class="trait-effect" id="trait-enhance-plus1-effect">+1강 강화확률 +0.0%<span class="trait-preview">(+0.1%)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-enhance-probability-plus1">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-enhance-probability-plus1">리셋</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-enhance-plus2-name">+2강 강화확률 증가</span>
+                  <span class="trait-level" id="trait-enhance-plus2-level">0/100Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-enhance-plus2-cost">비용: 1P</span>
+                  <span class="trait-effect" id="trait-enhance-plus2-effect">+2강 강화확률 +0.0%<span class="trait-preview">(+0.1%)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-enhance-probability-plus2">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-enhance-probability-plus2">리셋</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-enhance-plus3-name">+3강 강화확률 증가</span>
+                  <span class="trait-level" id="trait-enhance-plus3-level">0/100Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-enhance-plus3-cost">비용: 1P</span>
+                  <span class="trait-effect" id="trait-enhance-plus3-effect">+3강 강화확률 +0.0%<span class="trait-preview">(+0.1%)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-enhance-probability-plus3">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-enhance-probability-plus3">리셋</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-slot-name">사냥터 인원 증가</span>
+                  <span class="trait-level" id="trait-slot-level">0/20Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-slot-cost">비용: 1P</span>
+                  <span class="trait-effect" id="trait-slot-effect">+0칸 (총 10칸)<span class="trait-preview">(+1칸)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-slot-capacity">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-slot-capacity">리셋</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name" id="trait-automation-speed-name">자동화 속도증가(구매, 강화, 판매)</span>
+                  <span class="trait-level" id="trait-automation-speed-level">0/200Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="trait-automation-speed-cost">비용: 1P</span>
+                  <span class="trait-effect" id="trait-automation-speed-effect">속도: 구매/강화/판매 각 25회/초<span class="trait-preview">(+5회/초)</span></span>
+                </div>
+                <button class="btn-sm" id="upgrade-automation-speed">업글 (+1)</button>
+                <button class="btn-sm btn-reset" id="reset-automation-speed">리셋</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel-tab-content" data-tab-group-content="management" id="rebirth-tab">
+            <h3>환생 관리</h3>
+            <p class="feature-disabled-note" id="rebirth-disabled-notice">환생 시스템은 현재 비활성화 상태입니다. 추후 업데이트에서 다시 오픈될 예정입니다.</p>
+
+            <div class="resource-display">
+              <div class="resource-item">
+                <span class="resource-label">환생 포인트</span>
+                <span class="resource-value" id="rebirth-point-display">0</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">총 환생 횟수</span>
+                <span class="resource-value" id="rebirth-total-count">0회</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">누적 획득 포인트</span>
+                <span class="resource-value" id="rebirth-cumulative-points">0</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">최고도달단수</span>
+                <span class="resource-value" id="rebirth-highest-tier">1단</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">예상 획득 포인트</span>
+                <span class="resource-value" id="rebirth-preview-points">0</span>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn" id="rebirth-button">환생 실행</button>
+            </div>
+
+            <div class="trait-panel">
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name">자동화 개시 패스</span>
+                  <span class="trait-level" id="rebirth-automation-start-pass-level">0/5Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="rebirth-automation-start-pass-cost">비용: 1 환생 포인트</span>
+                  <span class="trait-effect" id="rebirth-automation-start-pass-effect">자동화 속도 +0회/초<span class="trait-preview">(+10회/초)</span></span>
+                </div>
+                <button class="btn-sm" id="rebirth-upgrade-automation-start-pass">업글 (+1)</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name">훈련 교본</span>
+                  <span class="trait-level" id="rebirth-training-manual-level">0/5Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="rebirth-training-manual-cost">비용: 1 환생 포인트</span>
+                  <span class="trait-effect" id="rebirth-training-manual-effect">판매 EXP +0%<span class="trait-preview">(+20%)</span></span>
+                </div>
+                <button class="btn-sm" id="rebirth-upgrade-training-manual">업글 (+1)</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="purchase-header">
+                    <span class="trait-name">돌파 기억</span>
+                    <span class="price-tooltip" id="rebirth-breakthrough-tooltip" tabindex="0" aria-label="돌파 기억 적용 범위 안내">
+                      !
+                      <span class="price-tooltip-text" id="rebirth-breakthrough-tooltip-text">최대 돌파 구간 강화에 적용</span>
+                    </span>
+                  </span>
+                  <span class="trait-level" id="rebirth-breakthrough-memory-level">0/5Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="rebirth-breakthrough-memory-cost">비용: 1 환생 포인트</span>
+                  <span class="trait-effect" id="rebirth-breakthrough-memory-effect">강화확률 +0%<span class="trait-preview">(+2%)</span></span>
+                </div>
+                <button class="btn-sm" id="rebirth-upgrade-breakthrough-memory">업글 (+1)</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name">선발대 지급</span>
+                  <span class="trait-level" id="rebirth-vanguard-grant-level">0/5Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="rebirth-vanguard-grant-cost">비용: 1 환생 포인트</span>
+                  <span class="trait-effect" id="rebirth-vanguard-grant-effect">환생 시 유닛 지급 없음<span class="trait-preview">(1단 유닛 10기 지급)</span></span>
+                </div>
+                <button class="btn-sm" id="rebirth-upgrade-vanguard-grant">업글 (+1)</button>
+              </div>
+
+              <div class="trait-item">
+                <div class="trait-header">
+                  <span class="trait-name">개척자 슬롯</span>
+                  <span class="trait-level" id="rebirth-pioneer-slots-level">0/5Lv</span>
+                </div>
+                <div class="trait-info">
+                  <span class="trait-cost" id="rebirth-pioneer-slots-cost">비용: 1 환생 포인트</span>
+                  <span class="trait-effect" id="rebirth-pioneer-slots-effect">기본 슬롯 +0<span class="trait-preview">(+2)</span></span>
+                </div>
+                <button class="btn-sm" id="rebirth-upgrade-pioneer-slots">업글 (+1)</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section panel-content" id="settings-panel">
+          <h2>설정</h2>
+          <h3>화면 유지</h3>
+          <div class="resource-display">
+            <div class="resource-item">
+              <span class="resource-label">현재 상태</span>
+              <span class="resource-value" id="wake-lock-status">지원 여부 확인 중...</span>
+            </div>
+          </div>
+          <p class="setting-note">기기의 화면 자동 꺼짐을 막아 게임 화면을 계속 켜둡니다. 브라우저/OS 정책에 따라 해제될 수 있습니다.</p>
+          <div class="actions">
+            <button class="btn" id="wake-lock-toggle-btn">화면 유지 켜기</button>
+          </div>
+
+          <h3>배속</h3>
+          <div class="resource-display">
+            <div class="resource-item">
+              <span class="resource-label">현재 배속</span>
+              <span class="resource-value" id="time-scale-status">1.0x</span>
+            </div>
+          </div>
+          <p class="setting-note">배속은 게임 틱과 자동화를 함께 가속합니다.</p>
+          <div class="actions time-scale-actions">
+            <button class="btn-sm time-scale-btn btn-toggle-on" data-time-scale="1">1x</button>
+            <button class="btn-sm time-scale-btn" data-time-scale="2" disabled title="1차 환생 보상으로 해금됩니다.">2x</button>
+            <button class="btn-sm time-scale-btn" data-time-scale="3" disabled title="2차 환생 보상으로 해금됩니다.">3x</button>
+          </div>
+
+          <h3>관리 이펙트</h3>
+          <div class="resource-display">
+            <div class="resource-item">
+              <span class="resource-label">강화/배치/판매 반짝임</span>
+              <span class="resource-value" id="unit-action-fx-status">켜짐</span>
+            </div>
+          </div>
+          <p class="setting-note">유닛 관리 탭의 강화 성공/실패, 배치, 회수, 판매 반짝임 효과를 켜거나 끕니다.</p>
+          <div class="actions">
+            <button class="btn" id="unit-action-fx-toggle-btn">관리 이펙트 끄기</button>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="footer">
+      <p>DPS Forge v0.1</p>
+      <p>페이지를 닫을 때 자동 저장됩니다.</p>
+    </footer>
+  </div>
+
+  <div class="tutorial-overlay" id="tutorial-overlay" hidden>
+    <div class="tutorial-panel" role="dialog" aria-live="polite" aria-label="튜토리얼 안내 카드">
+      <div class="tutorial-header-row">
+        <div class="tutorial-title">가이드</div>
+        <div class="tutorial-progress" id="tutorial-progress">1/1</div>
+      </div>
+      <div class="tutorial-caption" id="tutorial-caption"></div>
+      <div class="tutorial-actions">
+        <button type="button" class="btn-sm" id="tutorial-primary-btn">다음</button>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="btn-sm debug-toggle-btn" id="debug-toggle-open-btn">디버그 열기</button>
+
+  <div class="debug-panel" id="debug-panel" hidden>
+    <div class="debug-header-row">
+      <strong>디버그 로그</strong>
+      <div class="debug-header-actions">
+        <button type="button" class="btn-sm" id="debug-clear-btn">지우기</button>
+        <button type="button" class="btn-sm" id="debug-toggle-close-btn">닫기</button>
+      </div>
+    </div>
+    <div class="debug-state" id="debug-state">상태: 초기화 전</div>
+    <div class="debug-log" id="debug-log"></div>
+  </div>
+
+  <!-- 스크립트 -->
+  <script src="js/constants.js?v=20260529-02"></script>
+  <script src="js/gameLogic.js?v=20260529-02"></script>
+  <script src="js/ui.js?v=20260529-07"></script>
+</body>
+</html>
