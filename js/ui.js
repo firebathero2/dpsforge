@@ -151,7 +151,6 @@ class GameUI {
     this.updateInventoryDisplay();
     this.updateDeployedDisplay();
     this.updateMidBossPanel();
-    this.updateRebirthPanel();
     this.updateEmergencyRecoveryPanel();
     this.updateAutomationButtons();
     this.updateTraitPresetButtons();
@@ -1246,10 +1245,22 @@ class GameUI {
       earnedEl.textContent = this.formatAbcNumber(state.totalGoldEarned);
     }
 
-    const characterProgressText = state.requiredExpForNextLevel === 0
-      ? `Lv ${this.formatAbcNumber(state.characterLevel)} | MAX`
-      : `Lv ${this.formatAbcNumber(state.characterLevel)} | ${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)}`;
-    this.updateHudValue('character-progress', characterProgressText);
+    const characterProgressEl = document.getElementById('character-progress');
+    if (characterProgressEl) {
+      const levelText = this.formatAbcNumber(state.characterLevel);
+      const expText = state.requiredExpForNextLevel === 0
+        ? '(MAX)'
+        : `(${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)})`;
+      const nextProgressRaw = `${levelText}${expText}`;
+      const previousProgressRaw = characterProgressEl.dataset.lastValue;
+
+      characterProgressEl.innerHTML = `<span class="progress-level">${levelText}</span><span class="progress-exp">${expText}</span>`;
+
+      if (previousProgressRaw !== undefined && previousProgressRaw !== nextProgressRaw) {
+        this.flashHudValue(characterProgressEl);
+      }
+      characterProgressEl.dataset.lastValue = nextProgressRaw;
+    }
 
     this.updateHudValue('trait-points', state.traitPoints);
     this.updateHudValue('midboss-level', state.midBoss?.level || 0);
@@ -1263,8 +1274,6 @@ class GameUI {
     this.updateHudValue('total-play-time', this.formatDuration(state.totalPlayTimeSeconds || 0));
     this.updateHudValue('scaled-play-time', this.formatDuration(state.scaledPlayTimeSeconds || 0));
     this.updateHudValue('total-scaled-play-time', this.formatDuration(state.totalScaledPlayTimeSeconds || 0));
-    this.updateHudValue('status-rebirth-count', `${Math.floor(state.rebirth?.totalRebirthCount || 0)}회`);
-    this.updateHudValue('status-last-rebirth-tier', `${Math.floor(state.rebirth?.lastRebirthTier || 1)}단`);
 
     // 공격력 업글 정보 표시
     const attackLevel = state.traitLevels.attackPowerUpgrade || 0;
@@ -1333,169 +1342,6 @@ class GameUI {
       const automationSpeedMax = GAME_CONSTANTS.TRAIT_SYSTEMS.automationSpeedUpgrade?.maxLevel || 0;
       const automationSpeedPreviewText = automationSpeedLevel >= automationSpeedMax ? '' : '(+5회/초)';
       this.setTraitEffectText(automationSpeedEffectEl, `속도: 구매/강화/판매 각 ${automationSpeedRate}회/초`, automationSpeedPreviewText);
-    }
-  }
-
-  /**
-   * 환생 패널 업데이트
-   */
-  updateRebirthPanel() {
-    const state = gameEngine.getState();
-    const rebirth = state.rebirth || {};
-    const rewards = rebirth.rewards || {};
-    const rebirthDisabled = !GAME_CONSTANTS.REBIRTH_ENABLED;
-
-    const rebirthTabBtn = document.querySelector('.panel-tab[data-tab="rebirth-tab"]');
-    if (rebirthTabBtn) {
-      rebirthTabBtn.disabled = rebirthDisabled;
-      rebirthTabBtn.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
-    }
-
-    const rebirthTabPanel = document.getElementById('rebirth-tab');
-    if (rebirthDisabled && rebirthTabPanel?.classList.contains('active')) {
-      this.activatePanelTab('management', 'units-tab');
-    }
-
-    const rebirthNoticeEl = document.getElementById('rebirth-disabled-notice');
-    if (rebirthNoticeEl) {
-      rebirthNoticeEl.hidden = !rebirthDisabled;
-      rebirthNoticeEl.textContent = GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE;
-    }
-
-    const pointsEl = document.getElementById('rebirth-point-display');
-    if (pointsEl) {
-      pointsEl.textContent = this.formatAbcNumber(rebirth.points || 0);
-    }
-
-    const totalCountEl = document.getElementById('rebirth-total-count');
-    if (totalCountEl) {
-      totalCountEl.textContent = `${Math.floor(rebirth.totalRebirthCount || 0)}회`;
-    }
-
-    const cumulativePointsEl = document.getElementById('rebirth-cumulative-points');
-    if (cumulativePointsEl) {
-      cumulativePointsEl.textContent = this.formatAbcNumber(rebirth.cumulativePointsEarned || 0);
-    }
-
-    const highestTierEl = document.getElementById('rebirth-highest-tier');
-    if (highestTierEl) {
-      highestTierEl.textContent = `${Math.floor(rebirth.lastRebirthTier || 1)}단`;
-    }
-
-    const previewPointsEl = document.getElementById('rebirth-preview-points');
-    if (previewPointsEl) {
-      previewPointsEl.textContent = this.formatAbcNumber(state.rebirthPointPreview || 0);
-    }
-
-    const rebirthBtn = document.getElementById('rebirth-button');
-    if (rebirthBtn) {
-      rebirthBtn.disabled = rebirthDisabled || !state.rebirthCanRebirth;
-      rebirthBtn.textContent = rebirthDisabled
-        ? '업데이트 예정'
-        : (state.rebirthCanRebirth ? '환생 실행' : `${GAME_CONSTANTS.REBIRTH_UNLOCK_TIER}단 도달 필요`);
-      rebirthBtn.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
-    }
-
-    const bindings = [
-      {
-        key: 'automationStartPass',
-        levelId: 'rebirth-automation-start-pass-level',
-        costId: 'rebirth-automation-start-pass-cost',
-        effectId: 'rebirth-automation-start-pass-effect',
-        buttonId: 'rebirth-upgrade-automation-start-pass',
-        getEffectData: (level, isMax) => ({
-          base: `자동화 속도 +${10 * level}회/초`,
-          preview: isMax ? '' : '(+10회/초)'
-        })
-      },
-      {
-        key: 'trainingManual',
-        levelId: 'rebirth-training-manual-level',
-        costId: 'rebirth-training-manual-cost',
-        effectId: 'rebirth-training-manual-effect',
-        buttonId: 'rebirth-upgrade-training-manual',
-        getEffectData: (level, isMax) => ({
-          base: `판매 EXP +${20 * level}%`,
-          preview: isMax ? '' : '(+20%)'
-        })
-      },
-      {
-        key: 'breakthroughMemory',
-        levelId: 'rebirth-breakthrough-memory-level',
-        costId: 'rebirth-breakthrough-memory-cost',
-        effectId: 'rebirth-breakthrough-memory-effect',
-        buttonId: 'rebirth-upgrade-breakthrough-memory',
-        getEffectData: (level, isMax) => ({
-          base: `강화확률 +${2 * level}%`,
-          preview: isMax ? '' : '(+2%)'
-        })
-      },
-      {
-        key: 'vanguardGrant',
-        levelId: 'rebirth-vanguard-grant-level',
-        costId: 'rebirth-vanguard-grant-cost',
-        effectId: 'rebirth-vanguard-grant-effect',
-        buttonId: 'rebirth-upgrade-vanguard-grant',
-        getEffectData: (level, isMax) => {
-          if (level < 1) {
-            return {
-              base: '환생 시 유닛 지급 없음',
-              preview: '(1단 유닛 10기 지급)'
-            };
-          }
-          return {
-            base: `환생 시 ${level}단 유닛 10기 지급`,
-            preview: isMax ? '' : '(+1단)'
-          };
-        }
-      },
-      {
-        key: 'pioneerSlots',
-        levelId: 'rebirth-pioneer-slots-level',
-        costId: 'rebirth-pioneer-slots-cost',
-        effectId: 'rebirth-pioneer-slots-effect',
-        buttonId: 'rebirth-upgrade-pioneer-slots',
-        getEffectData: (level, isMax) => ({
-          base: `기본 슬롯 +${2 * level}`,
-          preview: isMax ? '' : '(+2)'
-        })
-      }
-    ];
-
-    const rewardSystems = GAME_CONSTANTS.REBIRTH_REWARDS || {};
-    for (const binding of bindings) {
-      const rewardMeta = rewardSystems[binding.key];
-      if (!rewardMeta) {
-        continue;
-      }
-
-      const level = Math.max(0, Math.floor(rewards[binding.key] || 0));
-      const isMax = level >= rewardMeta.maxLevel;
-      const cost = GAME_CONSTANTS.getRebirthRewardCost(binding.key, level);
-
-      const levelEl = document.getElementById(binding.levelId);
-      if (levelEl) {
-        levelEl.textContent = `${level}/${rewardMeta.maxLevel}Lv`;
-      }
-
-      const costEl = document.getElementById(binding.costId);
-      if (costEl) {
-        costEl.textContent = isMax
-          ? '비용: 최대 레벨'
-          : `비용: ${this.formatAbcNumber(cost || 0)} ${GAME_CONSTANTS.REBIRTH_POINT_NAME}`;
-      }
-
-      const effectEl = document.getElementById(binding.effectId);
-      if (effectEl) {
-        const effectData = binding.getEffectData(level, isMax);
-        this.setTraitEffectText(effectEl, effectData.base, effectData.preview);
-      }
-
-      const buttonEl = document.getElementById(binding.buttonId);
-      if (buttonEl) {
-        buttonEl.disabled = rebirthDisabled || isMax;
-        buttonEl.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
-      }
     }
   }
 
@@ -2528,11 +2374,6 @@ class GameUI {
       emergencyRecoveryBtn.addEventListener('click', () => this.onEmergencyRecovery());
     }
 
-    const rebirthButton = document.getElementById('rebirth-button');
-    if (rebirthButton) {
-      rebirthButton.addEventListener('click', () => this.onPerformRebirth());
-    }
-
     const firstRebirthBtn = document.getElementById('rebirth-first-button');
     if (firstRebirthBtn) {
       firstRebirthBtn.addEventListener('click', () => this.onPerformFirstRebirthUnlock());
@@ -2541,31 +2382,6 @@ class GameUI {
     const secondRebirthBtn = document.getElementById('rebirth-second-button');
     if (secondRebirthBtn) {
       secondRebirthBtn.addEventListener('click', () => this.onPerformSecondRebirthUnlock());
-    }
-
-    const rebirthAutomationStartPassBtn = document.getElementById('rebirth-upgrade-automation-start-pass');
-    if (rebirthAutomationStartPassBtn) {
-      rebirthAutomationStartPassBtn.addEventListener('click', () => this.onUpgradeRebirthReward('automationStartPass'));
-    }
-
-    const rebirthTrainingManualBtn = document.getElementById('rebirth-upgrade-training-manual');
-    if (rebirthTrainingManualBtn) {
-      rebirthTrainingManualBtn.addEventListener('click', () => this.onUpgradeRebirthReward('trainingManual'));
-    }
-
-    const rebirthBreakthroughMemoryBtn = document.getElementById('rebirth-upgrade-breakthrough-memory');
-    if (rebirthBreakthroughMemoryBtn) {
-      rebirthBreakthroughMemoryBtn.addEventListener('click', () => this.onUpgradeRebirthReward('breakthroughMemory'));
-    }
-
-    const rebirthVanguardGrantBtn = document.getElementById('rebirth-upgrade-vanguard-grant');
-    if (rebirthVanguardGrantBtn) {
-      rebirthVanguardGrantBtn.addEventListener('click', () => this.onUpgradeRebirthReward('vanguardGrant'));
-    }
-
-    const rebirthPioneerSlotsBtn = document.getElementById('rebirth-upgrade-pioneer-slots');
-    if (rebirthPioneerSlotsBtn) {
-      rebirthPioneerSlotsBtn.addEventListener('click', () => this.onUpgradeRebirthReward('pioneerSlots'));
     }
 
     // 자동판매 버튼: 단수별 자동판매 토글 (5단~10단)
@@ -3071,52 +2887,6 @@ class GameUI {
       console.warn(result.message);
       alert(result.message);
     }
-  }
-
-  /**
-   * 환생 실행
-   */
-  onPerformRebirth() {
-    if (!GAME_CONSTANTS.REBIRTH_ENABLED) {
-      alert(GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE);
-      return;
-    }
-
-    const confirmed = confirm('환생하면 현재 유닛/골드/특성 진행도가 초기화됩니다.\n환생하시겠습니까?');
-    if (!confirmed) {
-      return;
-    }
-
-    // 환생 직후 첫 틱에서 기존 자동화가 동작하지 않도록 선제적으로 OFF 처리
-    this.resetAllAutomationState();
-
-    const result = gameEngine.performRebirth();
-    if (result.success) {
-      alert(`${result.message}\n현재 보유: ${result.totalPoints} ${GAME_CONSTANTS.REBIRTH_POINT_NAME}`);
-      this.midBossRun = null;
-      this.updateUI();
-      return;
-    }
-
-    alert(result.message);
-  }
-
-  /**
-   * 환생 보상 업그레이드
-   */
-  onUpgradeRebirthReward(rewardKey) {
-    if (!GAME_CONSTANTS.REBIRTH_ENABLED) {
-      alert(GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE);
-      return;
-    }
-
-    const result = gameEngine.upgradeRebirthReward(rewardKey);
-    if (!result.success) {
-      alert(result.message);
-      return;
-    }
-
-    this.updateUI();
   }
 
   /**

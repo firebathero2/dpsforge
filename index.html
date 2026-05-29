@@ -20,10 +20,9 @@
           <span class="resource-value" id="gold-display">0</span>
         </div>
         <div class="resource-item resource-item-progress">
-          <span class="resource-label">레벨 / 경험치</span>
+          <span class="resource-label">레벨(경험치)</span>
           <span class="resource-value resource-value-stack" id="character-progress">
-            <span class="progress-level">Lv 1</span>
-            <span class="progress-exp">0 / 5</span>
+            <span class="progress-level">1</span><span class="progress-exp">(0 / 5)</span>
           </span>
         </div>
         <div class="resource-item">
@@ -96,14 +95,6 @@
             <div class="resource-item">
               <span class="resource-label">누적 배속플레이시간:</span>
               <span class="resource-value" id="total-scaled-play-time">00:00:00</span>
-            </div>
-            <div class="resource-item">
-              <span class="resource-label">환생 횟수:</span>
-              <span class="resource-value" id="status-rebirth-count">0회</span>
-            </div>
-            <div class="resource-item">
-              <span class="resource-label">최고도달단수:</span>
-              <span class="resource-value" id="status-last-rebirth-tier">1단</span>
             </div>
           </div>
 
@@ -299,7 +290,6 @@
           <div class="panel-tabs" data-tab-group="management">
             <button class="panel-tab active" data-tab-group="management" data-tab="units-tab">유닛 관리</button>
             <button class="panel-tab" data-tab-group="management" data-tab="traits-tab">특성 관리</button>
-            <button class="panel-tab" data-tab-group="management" data-tab="rebirth-tab">환생관리(예정)</button>
           </div>
 
           <div class="panel-tab-content active" data-tab-group-content="management" id="units-tab">
@@ -559,105 +549,6 @@
             </div>
           </div>
 
-          <div class="panel-tab-content" data-tab-group-content="management" id="rebirth-tab">
-            <h3>환생 관리</h3>
-            <p class="feature-disabled-note" id="rebirth-disabled-notice">환생 시스템은 현재 비활성화 상태입니다. 추후 업데이트에서 다시 오픈될 예정입니다.</p>
-
-            <div class="resource-display">
-              <div class="resource-item">
-                <span class="resource-label">환생 포인트</span>
-                <span class="resource-value" id="rebirth-point-display">0</span>
-              </div>
-              <div class="resource-item">
-                <span class="resource-label">총 환생 횟수</span>
-                <span class="resource-value" id="rebirth-total-count">0회</span>
-              </div>
-              <div class="resource-item">
-                <span class="resource-label">누적 획득 포인트</span>
-                <span class="resource-value" id="rebirth-cumulative-points">0</span>
-              </div>
-              <div class="resource-item">
-                <span class="resource-label">최고도달단수</span>
-                <span class="resource-value" id="rebirth-highest-tier">1단</span>
-              </div>
-              <div class="resource-item">
-                <span class="resource-label">예상 획득 포인트</span>
-                <span class="resource-value" id="rebirth-preview-points">0</span>
-              </div>
-            </div>
-
-            <div class="actions">
-              <button class="btn" id="rebirth-button">환생 실행</button>
-            </div>
-
-            <div class="trait-panel">
-              <div class="trait-item">
-                <div class="trait-header">
-                  <span class="trait-name">자동화 개시 패스</span>
-                  <span class="trait-level" id="rebirth-automation-start-pass-level">0/5Lv</span>
-                </div>
-                <div class="trait-info">
-                  <span class="trait-cost" id="rebirth-automation-start-pass-cost">비용: 1 환생 포인트</span>
-                  <span class="trait-effect" id="rebirth-automation-start-pass-effect">자동화 속도 +0회/초<span class="trait-preview">(+10회/초)</span></span>
-                </div>
-                <button class="btn-sm" id="rebirth-upgrade-automation-start-pass">업글 (+1)</button>
-              </div>
-
-              <div class="trait-item">
-                <div class="trait-header">
-                  <span class="trait-name">훈련 교본</span>
-                  <span class="trait-level" id="rebirth-training-manual-level">0/5Lv</span>
-                </div>
-                <div class="trait-info">
-                  <span class="trait-cost" id="rebirth-training-manual-cost">비용: 1 환생 포인트</span>
-                  <span class="trait-effect" id="rebirth-training-manual-effect">판매 EXP +0%<span class="trait-preview">(+20%)</span></span>
-                </div>
-                <button class="btn-sm" id="rebirth-upgrade-training-manual">업글 (+1)</button>
-              </div>
-
-              <div class="trait-item">
-                <div class="trait-header">
-                  <span class="purchase-header">
-                    <span class="trait-name">돌파 기억</span>
-                    <span class="price-tooltip" id="rebirth-breakthrough-tooltip" tabindex="0" aria-label="돌파 기억 적용 범위 안내">
-                      !
-                      <span class="price-tooltip-text" id="rebirth-breakthrough-tooltip-text">최대 돌파 구간 강화에 적용</span>
-                    </span>
-                  </span>
-                  <span class="trait-level" id="rebirth-breakthrough-memory-level">0/5Lv</span>
-                </div>
-                <div class="trait-info">
-                  <span class="trait-cost" id="rebirth-breakthrough-memory-cost">비용: 1 환생 포인트</span>
-                  <span class="trait-effect" id="rebirth-breakthrough-memory-effect">강화확률 +0%<span class="trait-preview">(+2%)</span></span>
-                </div>
-                <button class="btn-sm" id="rebirth-upgrade-breakthrough-memory">업글 (+1)</button>
-              </div>
-
-              <div class="trait-item">
-                <div class="trait-header">
-                  <span class="trait-name">선발대 지급</span>
-                  <span class="trait-level" id="rebirth-vanguard-grant-level">0/5Lv</span>
-                </div>
-                <div class="trait-info">
-                  <span class="trait-cost" id="rebirth-vanguard-grant-cost">비용: 1 환생 포인트</span>
-                  <span class="trait-effect" id="rebirth-vanguard-grant-effect">환생 시 유닛 지급 없음<span class="trait-preview">(1단 유닛 10기 지급)</span></span>
-                </div>
-                <button class="btn-sm" id="rebirth-upgrade-vanguard-grant">업글 (+1)</button>
-              </div>
-
-              <div class="trait-item">
-                <div class="trait-header">
-                  <span class="trait-name">개척자 슬롯</span>
-                  <span class="trait-level" id="rebirth-pioneer-slots-level">0/5Lv</span>
-                </div>
-                <div class="trait-info">
-                  <span class="trait-cost" id="rebirth-pioneer-slots-cost">비용: 1 환생 포인트</span>
-                  <span class="trait-effect" id="rebirth-pioneer-slots-effect">기본 슬롯 +0<span class="trait-preview">(+2)</span></span>
-                </div>
-                <button class="btn-sm" id="rebirth-upgrade-pioneer-slots">업글 (+1)</button>
-              </div>
-            </div>
-          </div>
         </section>
 
         <section class="section panel-content" id="settings-panel">
