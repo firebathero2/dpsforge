@@ -534,6 +534,7 @@ class GameEngine {
       console.warn(`Tier ${tier} cannot be sold`);
       return {
         success: false,
+        reason: 'INVALID_TIER',
         sold: 0,
         gainedExp: 0,
         leveledUp: 0,
@@ -545,11 +546,31 @@ class GameEngine {
       console.warn(`Not enough tier ${tier} inventory to sell`);
       return {
         success: false,
+        reason: 'NOT_ENOUGH_INVENTORY',
         sold: 0,
         gainedExp: 0,
         leveledUp: 0,
         gainedTraitPoints: 0
       };
+    }
+
+    const requiresSellTicket = tier >= GAME_CONSTANTS.SELL_TICKET_REQUIRED_TIER_START;
+    if (requiresSellTicket) {
+      const requiredTicket = Math.max(1, Math.floor((GAME_CONSTANTS.SELL_TICKET_COST_PER_UNIT || 1) * quantity));
+      const currentTicket = Math.max(0, Math.floor(Number(this.state.sellTicket) || 0));
+      if (currentTicket < requiredTicket) {
+        return {
+          success: false,
+          reason: 'SELL_TICKET_REQUIRED',
+          requiredTicket,
+          currentTicket,
+          sold: 0,
+          gainedExp: 0,
+          leveledUp: 0,
+          gainedTraitPoints: 0
+        };
+      }
+      this.state.sellTicket = currentTicket - requiredTicket;
     }
 
     const expPerUnit = GAME_CONSTANTS.getSellExpByTier(tier);

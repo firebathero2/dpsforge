@@ -1054,6 +1054,10 @@ body::before {
   height: 17px;
 }
 
+.btn-rebirth-action[hidden] + .rebirth-info-tooltip {
+  display: none;
+}
+
 .unit-table tbody tr:hover {
   background-color: rgba(6, 182, 212, 0.12);
 }

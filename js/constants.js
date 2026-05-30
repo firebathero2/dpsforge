@@ -8,6 +8,8 @@ const GAME_CONSTANTS = {
   MIN_SELL_TIER: 15,
   ACT2_TIER_START: 26,
   ACT2_INCOME_MULTIPLIER: 100000,
+  SELL_TICKET_REQUIRED_TIER_START: 26,
+  SELL_TICKET_COST_PER_UNIT: 1,
 
   // 기본 리소스
   STARTING_GOLD: 0,
@@ -415,6 +417,7 @@ function initGameState() {
       unlocked: false,
       noticeShown: false
     },
+    sellTicket: 0,
     lastTickTime: Date.now(),
     offlineGoldGenerated: 0
   };

@@ -1236,7 +1236,14 @@ class GameUI {
           break;
         }
 
-        gameEngine.sellUnit(tier, 1);
+        const result = gameEngine.sellUnit(tier, 1);
+        if (!result.success) {
+          this.autoSellAccumulatorSecByTier[tier] = Math.min(
+            this.autoSellAccumulatorSecByTier[tier],
+            this.autoSellIntervalSec
+          );
+          break;
+        }
       }
     }
   }
@@ -2614,6 +2621,13 @@ class GameUI {
       this.pulseTierRows(tier, 'fx-tier-sell');
       this.spawnBattleFloatText(`판매 +${this.formatAbcNumber(result.gainedExp)}EXP`, 'fx-sell');
       this.updateUI();
+      return;
+    }
+
+    if (result.reason === 'SELL_TICKET_REQUIRED') {
+      const requiredTicket = Math.max(1, Math.floor(Number(result.requiredTicket) || 1));
+      const currentTicket = Math.max(0, Math.floor(Number(result.currentTicket) || 0));
+      alert(`판매권이 부족합니다. 필요 ${requiredTicket}, 보유 ${currentTicket}`);
     }
   }
 
@@ -3051,8 +3065,12 @@ class GameUI {
         this.timeScale = this.availableTimeScales.includes(savedScale) ? savedScale : 1;
         this.activeTraitPreset = Math.min(5, Math.max(1, Number.parseInt(state.activeTraitPreset, 10) || 1));
         this.unitActionFxEnabled = state.unitActionFxEnabled !== false;
-        this.firstRebirthCompleted = Boolean(state.firstRebirthCompleted);
-        this.secondRebirthCompleted = Boolean(state.secondRebirthCompleted);
+        const hasFirstFlag = Object.prototype.hasOwnProperty.call(state, 'firstRebirthCompleted');
+        const hasSecondFlag = Object.prototype.hasOwnProperty.call(state, 'secondRebirthCompleted');
+        const inferredFirstCompleted = hasFirstFlag ? Boolean(state.firstRebirthCompleted) : savedScale >= 2;
+        const inferredSecondCompleted = hasSecondFlag ? Boolean(state.secondRebirthCompleted) : savedScale >= 3;
+        this.firstRebirthCompleted = inferredFirstCompleted || inferredSecondCompleted;
+        this.secondRebirthCompleted = inferredSecondCompleted;
         this.updateAutomationButtons();
         this.updateTraitPresetButtons();
         this.updateUnitActionFxUi();
