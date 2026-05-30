@@ -27,7 +27,6 @@ class GameUI {
     this.availableTimeScales = [1, 2, 3];
     this.firstRebirthCompleted = false;
     this.secondRebirthCompleted = false;
-    this.lastLoopTimestampMs = null;
     this.traitPresetNames = {
       1: '1',
       2: '2',
@@ -51,11 +50,10 @@ class GameUI {
         mode: 'action',
         targetButtonId: 'deploy-tier-1',
         getCaption: () => {
-          const state = gameEngine.getState();
-          const currentPopulation = Math.max(0, Math.floor(Number(state.deployed?.[1]) || 0));
-          return `1단 유닛을 10기 배치해보세요. (${currentPopulation}/10)`;
+          const currentPopulation = this.getTotalDeployedUnitCount();
+          return `1단 이상 유닛을 10기 배치해보세요. (${currentPopulation}/10)`;
         },
-        isCompleted: () => Math.max(0, Math.floor(Number(gameEngine.state.deployed?.[1]) || 0)) >= 10
+        isCompleted: () => this.getTotalDeployedUnitCount() >= 10
       },
       {
         id: 'upgrade',
@@ -126,14 +124,9 @@ class GameUI {
    * 게임 루프 시작
    */
   startGameLoop() {
-    this.lastLoopTimestampMs = performance.now();
     this.gameLoopId = setInterval(() => {
-      const nowMs = performance.now();
-      const elapsedRealSec = Math.max(0, (nowMs - (this.lastLoopTimestampMs || nowMs)) / 1000);
-      this.lastLoopTimestampMs = nowMs;
-
-      const realDelta = elapsedRealSec;
-      const scaledDelta = elapsedRealSec * this.timeScale;
+      const realDelta = GAME_CONSTANTS.TICK_INTERVAL;
+      const scaledDelta = GAME_CONSTANTS.TICK_INTERVAL * this.timeScale;
       gameEngine.tick(scaledDelta, realDelta);
       this.runAutomation(scaledDelta);
       this.updateUI();
@@ -146,9 +139,7 @@ class GameUI {
   stopGameLoop() {
     if (this.gameLoopId) {
       clearInterval(this.gameLoopId);
-      this.gameLoopId = null;
     }
-    this.lastLoopTimestampMs = null;
   }
   
   /**
@@ -159,6 +150,7 @@ class GameUI {
     this.updateInventoryDisplay();
     this.updateDeployedDisplay();
     this.updateMidBossPanel();
+    this.updateRebirthPanel();
     this.updateEmergencyRecoveryPanel();
     this.updateAutomationButtons();
     this.updateTraitPresetButtons();
@@ -279,6 +271,17 @@ class GameUI {
   getTutorialState() {
     const state = gameEngine?.state?.tutorial;
     return state && typeof state === 'object' ? state : null;
+  }
+
+  getTotalDeployedUnitCount() {
+    const deployed = gameEngine?.state?.deployed;
+    if (!deployed || typeof deployed !== 'object') {
+      return 0;
+    }
+
+    return Object.values(deployed).reduce((total, amount) => {
+      return total + Math.max(0, Math.floor(Number(amount) || 0));
+    }, 0);
   }
 
   getCurrentTutorialNode() {
@@ -646,10 +649,6 @@ class GameUI {
   }
 
   canPerformSecondRebirth(state) {
-    if (!this.firstRebirthCompleted) {
-      return false;
-    }
-
     const level = Math.max(1, Math.floor(Number(state?.characterLevel) || 1));
     const inventoryCount = Math.max(0, Math.floor(Number(state?.inventory?.[20]) || 0));
     const deployedCount = Math.max(0, Math.floor(Number(state?.deployed?.[20]) || 0));
@@ -660,39 +659,23 @@ class GameUI {
     const currentState = state || gameEngine.getState();
     const firstBtn = document.getElementById('rebirth-first-button');
     const secondBtn = document.getElementById('rebirth-second-button');
-    const firstWrap = firstBtn ? firstBtn.closest('.rebirth-action-wrap') : null;
-    const secondWrap = secondBtn ? secondBtn.closest('.rebirth-action-wrap') : null;
 
     if (firstBtn) {
       firstBtn.title = '조건 : 2레벨 달성\n보상 : 2배속 해금';
       if (this.firstRebirthCompleted) {
         firstBtn.hidden = true;
-        if (firstWrap) {
-          firstWrap.hidden = true;
-        }
       } else {
         firstBtn.hidden = false;
-        if (firstWrap) {
-          firstWrap.hidden = false;
-        }
         firstBtn.disabled = !this.canPerformFirstRebirth(currentState);
       }
     }
 
     if (secondBtn) {
-      secondBtn.title = this.firstRebirthCompleted
-        ? '조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금'
-        : '선행 조건 : 1차 환생 완료';
+      secondBtn.title = '조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금';
       if (this.secondRebirthCompleted) {
         secondBtn.hidden = true;
-        if (secondWrap) {
-          secondWrap.hidden = true;
-        }
       } else {
         secondBtn.hidden = false;
-        if (secondWrap) {
-          secondWrap.hidden = false;
-        }
         secondBtn.disabled = !this.canPerformSecondRebirth(currentState);
         secondBtn.textContent = '2차 환생';
       }
@@ -735,11 +718,6 @@ class GameUI {
   onPerformSecondRebirthUnlock() {
     const state = gameEngine.getState();
     if (this.secondRebirthCompleted) {
-      return;
-    }
-
-    if (!this.firstRebirthCompleted) {
-      alert('2차 환생은 1차 환생 완료 후 활성화됩니다.');
       return;
     }
 
@@ -979,22 +957,10 @@ class GameUI {
       if (tier >= GAME_CONSTANTS.MIN_SELL_TIER) {
         const sellExp = GAME_CONSTANTS.getSellExpByTier(tier);
         const firstRebirthAction = tier === 15
-          ? `<span class="rebirth-action-wrap">
-              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-first-button" title="조건 : 2레벨 달성&#10;보상 : 2배속 해금">1차 환생</button>
-              <span class="price-tooltip rebirth-info-tooltip" tabindex="0" aria-label="1차 환생 안내">
-                !
-                <span class="price-tooltip-text">조건 : 2레벨 달성\n보상 : 2배속 해금</span>
-              </span>
-            </span>`
+          ? '<button type="button" class="btn-sm btn-rebirth-action" id="rebirth-first-button" title="조건 : 2레벨 달성&#10;보상 : 2배속 해금">1차 환생</button>'
           : '';
         const secondRebirthAction = tier === 20
-          ? `<span class="rebirth-action-wrap">
-              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3배속 해금">2차 환생</button>
-              <span class="price-tooltip rebirth-info-tooltip" tabindex="0" aria-label="2차 환생 안내">
-                !
-                <span class="price-tooltip-text">선행 : 1차 환생 완료\n조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금</span>
-              </span>
-            </span>`
+          ? '<button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3배속 해금">2차 환생</button>'
           : '';
         sellCell = `
           <div class="sell-actions">
@@ -1045,7 +1011,9 @@ class GameUI {
       { elementId: 'trait-attack-cost', traitType: 'attackPowerUpgrade' },
       { elementId: 'trait-enhance-plus1-cost', traitType: 'enhanceProbabilityPlus1Upgrade' },
       { elementId: 'trait-enhance-plus2-cost', traitType: 'enhanceProbabilityPlus2Upgrade' },
-      { elementId: 'trait-enhance-plus3-cost', traitType: 'enhanceProbabilityPlus3Upgrade' }
+      { elementId: 'trait-enhance-plus3-cost', traitType: 'enhanceProbabilityPlus3Upgrade' },
+      { elementId: 'trait-slot-cost', traitType: 'slotCapacityUpgrade' },
+      { elementId: 'trait-automation-speed-cost', traitType: 'automationSpeedUpgrade' }
     ];
 
     for (const binding of costBindings) {
@@ -1136,11 +1104,12 @@ class GameUI {
   }
 
   /**
-   * 자동화 간격 동기화
+   * 특성 레벨에 따라 자동화 간격 동기화
    */
   syncAutomationIntervals() {
+    const traitLevels = gameEngine.state.traitLevels || {};
     const automationStartPassLevel = Math.max(0, Math.floor(gameEngine.state.rebirth?.rewards?.automationStartPass || 0));
-    const automationRate = GAME_CONSTANTS.AUTO_BASE_ACTIONS_PER_SEC
+    const automationRate = GAME_CONSTANTS.getAutomationActionsPerSecond(traitLevels.automationSpeedUpgrade || 0)
       + (automationStartPassLevel * 10);
 
     this.autoBuyIntervalSec = 1 / automationRate;
@@ -1236,14 +1205,7 @@ class GameUI {
           break;
         }
 
-        const result = gameEngine.sellUnit(tier, 1);
-        if (!result.success) {
-          this.autoSellAccumulatorSecByTier[tier] = Math.min(
-            this.autoSellAccumulatorSecByTier[tier],
-            this.autoSellIntervalSec
-          );
-          break;
-        }
+        gameEngine.sellUnit(tier, 1);
       }
     }
   }
@@ -1254,46 +1216,9 @@ class GameUI {
   updateResourceDisplay() {
     const state = gameEngine.getState();
 
-    if (state.act2?.unlocked && !state.act2?.noticeShown) {
-      gameEngine.state.act2.noticeShown = true;
-      alert('새로운 액트가 열렸습니다!\n26단 이상 유닛은 독립 수입 배율(1배 시작)과 100000배 수입 규칙이 적용됩니다.');
-    }
-
-    const goldDisplayEl = document.getElementById('gold-display');
-    if (goldDisplayEl) {
-      const goldText = this.formatAbcNumber(state.gold);
-      const incomeText = this.formatAbcNumber(state.currentIncomePerSecond, { smallAsInteger: false });
-      const nextGoldRaw = `${goldText}|${incomeText}`;
-
-      goldDisplayEl.innerHTML = `<span class="gold-primary">${goldText}</span><span class="gold-income">(+${incomeText}/s)</span>`;
-      goldDisplayEl.dataset.lastValue = nextGoldRaw;
-    }
-
-    const dpsDisplayEl = document.getElementById('dps-display');
-    if (dpsDisplayEl) {
-      const primaryDpsValue = Math.max(0, Number(state.currentDPSPrimary) || 0);
-      const primaryDpsText = this.formatAbcNumber(primaryDpsValue);
-      const secondaryDpsValue = Math.max(0, Number(state.currentDPSSecondary) || 0);
-      const secondaryDpsText = this.formatAbcNumber(secondaryDpsValue);
-      const showPrimary = primaryDpsValue > 0 || secondaryDpsValue <= 0;
-      const showSecondary = secondaryDpsValue > 0;
-      const nextDpsRaw = `${showPrimary ? primaryDpsText : ''}|${showSecondary ? secondaryDpsText : ''}`;
-      const previousDpsRaw = dpsDisplayEl.dataset.lastValue;
-
-      if (showPrimary && showSecondary) {
-        dpsDisplayEl.innerHTML = `<span class="dps-primary">${primaryDpsText}</span><span class="dps-separator">/</span><span class="dps-secondary">${secondaryDpsText}</span>`;
-      } else if (showSecondary) {
-        dpsDisplayEl.innerHTML = `<span class="dps-secondary">${secondaryDpsText}</span>`;
-      } else {
-        dpsDisplayEl.innerHTML = `<span class="dps-primary">${primaryDpsText}</span>`;
-      }
-
-      if (previousDpsRaw !== undefined && previousDpsRaw !== nextDpsRaw) {
-        this.flashHudValue(dpsDisplayEl);
-      }
-      dpsDisplayEl.dataset.lastValue = nextDpsRaw;
-    }
-
+    this.updateHudValue('gold-display', this.formatAbcNumber(state.gold));
+    this.updateHudValue('dps-display', this.formatAbcNumber(state.currentDPS));
+    this.emitHudGainFx('gold', state.gold, 'fx-gold');
     this.emitHudGainFx('dps', state.currentDPS, 'fx-boss');
     
     // 수입 배율
@@ -1320,34 +1245,31 @@ class GameUI {
       earnedEl.textContent = this.formatAbcNumber(state.totalGoldEarned);
     }
 
-    const characterProgressEl = document.getElementById('character-progress');
-    if (characterProgressEl) {
-      const levelText = `Lv ${this.formatAbcNumber(state.characterLevel)}`;
-      const expText = state.requiredExpForNextLevel === 0
-        ? '(MAX)'
-        : `(${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)})`;
-      const nextProgressRaw = `${levelText}${expText}`;
-      const previousProgressRaw = characterProgressEl.dataset.lastValue;
+    this.updateHudValue('character-level', state.characterLevel);
 
-      characterProgressEl.innerHTML = `<span class="progress-level">${levelText}</span><span class="progress-exp">${expText}</span>`;
-
-      if (previousProgressRaw !== undefined && previousProgressRaw !== nextProgressRaw) {
-        this.flashHudValue(characterProgressEl);
-      }
-      characterProgressEl.dataset.lastValue = nextProgressRaw;
+    // 캐릭터 경험치
+    const expEl = document.getElementById('character-exp');
+    if (expEl) {
+      const nextExpText = state.requiredExpForNextLevel === 0
+        ? 'MAX'
+        : `${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)}`;
+      this.updateHudValue('character-exp', nextExpText);
     }
 
     this.updateHudValue('trait-points', state.traitPoints);
     this.updateHudValue('midboss-level', state.midBoss?.level || 0);
     this.updateHudValue('slot-population', `${state.deployedCount} / ${state.slotCap}`);
+    const automationSpeedLevel = state.traitLevels.automationSpeedUpgrade || 0;
     const automationStartPassLevel = Math.max(0, Math.floor(state.rebirth?.rewards?.automationStartPass || 0));
-    const automationSpeedRate = GAME_CONSTANTS.AUTO_BASE_ACTIONS_PER_SEC
+    const automationSpeedRate = GAME_CONSTANTS.getAutomationActionsPerSecond(automationSpeedLevel)
       + (automationStartPassLevel * 10);
     this.updateHudValue('status-automation-rate', `각 ${automationSpeedRate}회/초`);
     this.updateHudValue('play-time', this.formatDuration(state.playTimeSeconds || 0));
     this.updateHudValue('total-play-time', this.formatDuration(state.totalPlayTimeSeconds || 0));
     this.updateHudValue('scaled-play-time', this.formatDuration(state.scaledPlayTimeSeconds || 0));
     this.updateHudValue('total-scaled-play-time', this.formatDuration(state.totalScaledPlayTimeSeconds || 0));
+    this.updateHudValue('status-rebirth-count', `${Math.floor(state.rebirth?.totalRebirthCount || 0)}회`);
+    this.updateHudValue('status-last-rebirth-tier', `${Math.floor(state.rebirth?.lastRebirthTier || 1)}단`);
 
     // 공격력 업글 정보 표시
     const attackLevel = state.traitLevels.attackPowerUpgrade || 0;
@@ -1397,6 +1319,188 @@ class GameUI {
       }
     }
 
+    // 사냥터 인원 증가 특성 정보 표시
+    const slotLevel = state.traitLevels.slotCapacityUpgrade || 0;
+    const slotLevelEl = document.getElementById('trait-slot-level');
+    const slotEffectEl = document.getElementById('trait-slot-effect');
+    if (slotLevelEl) slotLevelEl.textContent = this.formatTraitLevel('slotCapacityUpgrade', slotLevel);
+    if (slotEffectEl) {
+      const slotMax = GAME_CONSTANTS.TRAIT_SYSTEMS.slotCapacityUpgrade?.maxLevel || 0;
+      const slotPreviewText = slotLevel >= slotMax ? '' : '(+1칸)';
+      this.setTraitEffectText(slotEffectEl, `+${slotLevel}칸 (총 ${state.slotCap}칸)`, slotPreviewText);
+    }
+
+    // 자동화 속도 특성 정보 표시
+    const automationSpeedLevelEl = document.getElementById('trait-automation-speed-level');
+    const automationSpeedEffectEl = document.getElementById('trait-automation-speed-effect');
+    if (automationSpeedLevelEl) automationSpeedLevelEl.textContent = this.formatTraitLevel('automationSpeedUpgrade', automationSpeedLevel);
+    if (automationSpeedEffectEl) {
+      const automationSpeedMax = GAME_CONSTANTS.TRAIT_SYSTEMS.automationSpeedUpgrade?.maxLevel || 0;
+      const automationSpeedPreviewText = automationSpeedLevel >= automationSpeedMax ? '' : '(+5회/초)';
+      this.setTraitEffectText(automationSpeedEffectEl, `속도: 구매/강화/판매 각 ${automationSpeedRate}회/초`, automationSpeedPreviewText);
+    }
+  }
+
+  /**
+   * 환생 패널 업데이트
+   */
+  updateRebirthPanel() {
+    const state = gameEngine.getState();
+    const rebirth = state.rebirth || {};
+    const rewards = rebirth.rewards || {};
+    const rebirthDisabled = !GAME_CONSTANTS.REBIRTH_ENABLED;
+
+    const rebirthTabBtn = document.querySelector('.panel-tab[data-tab="rebirth-tab"]');
+    if (rebirthTabBtn) {
+      rebirthTabBtn.disabled = rebirthDisabled;
+      rebirthTabBtn.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
+    }
+
+    const rebirthTabPanel = document.getElementById('rebirth-tab');
+    if (rebirthDisabled && rebirthTabPanel?.classList.contains('active')) {
+      this.activatePanelTab('management', 'units-tab');
+    }
+
+    const rebirthNoticeEl = document.getElementById('rebirth-disabled-notice');
+    if (rebirthNoticeEl) {
+      rebirthNoticeEl.hidden = !rebirthDisabled;
+      rebirthNoticeEl.textContent = GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE;
+    }
+
+    const pointsEl = document.getElementById('rebirth-point-display');
+    if (pointsEl) {
+      pointsEl.textContent = this.formatAbcNumber(rebirth.points || 0);
+    }
+
+    const totalCountEl = document.getElementById('rebirth-total-count');
+    if (totalCountEl) {
+      totalCountEl.textContent = `${Math.floor(rebirth.totalRebirthCount || 0)}회`;
+    }
+
+    const cumulativePointsEl = document.getElementById('rebirth-cumulative-points');
+    if (cumulativePointsEl) {
+      cumulativePointsEl.textContent = this.formatAbcNumber(rebirth.cumulativePointsEarned || 0);
+    }
+
+    const highestTierEl = document.getElementById('rebirth-highest-tier');
+    if (highestTierEl) {
+      highestTierEl.textContent = `${Math.floor(rebirth.lastRebirthTier || 1)}단`;
+    }
+
+    const previewPointsEl = document.getElementById('rebirth-preview-points');
+    if (previewPointsEl) {
+      previewPointsEl.textContent = this.formatAbcNumber(state.rebirthPointPreview || 0);
+    }
+
+    const rebirthBtn = document.getElementById('rebirth-button');
+    if (rebirthBtn) {
+      rebirthBtn.disabled = rebirthDisabled || !state.rebirthCanRebirth;
+      rebirthBtn.textContent = rebirthDisabled
+        ? '업데이트 예정'
+        : (state.rebirthCanRebirth ? '환생 실행' : `${GAME_CONSTANTS.REBIRTH_UNLOCK_TIER}단 도달 필요`);
+      rebirthBtn.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
+    }
+
+    const bindings = [
+      {
+        key: 'automationStartPass',
+        levelId: 'rebirth-automation-start-pass-level',
+        costId: 'rebirth-automation-start-pass-cost',
+        effectId: 'rebirth-automation-start-pass-effect',
+        buttonId: 'rebirth-upgrade-automation-start-pass',
+        getEffectData: (level, isMax) => ({
+          base: `자동화 속도 +${10 * level}회/초`,
+          preview: isMax ? '' : '(+10회/초)'
+        })
+      },
+      {
+        key: 'trainingManual',
+        levelId: 'rebirth-training-manual-level',
+        costId: 'rebirth-training-manual-cost',
+        effectId: 'rebirth-training-manual-effect',
+        buttonId: 'rebirth-upgrade-training-manual',
+        getEffectData: (level, isMax) => ({
+          base: `판매 EXP +${20 * level}%`,
+          preview: isMax ? '' : '(+20%)'
+        })
+      },
+      {
+        key: 'breakthroughMemory',
+        levelId: 'rebirth-breakthrough-memory-level',
+        costId: 'rebirth-breakthrough-memory-cost',
+        effectId: 'rebirth-breakthrough-memory-effect',
+        buttonId: 'rebirth-upgrade-breakthrough-memory',
+        getEffectData: (level, isMax) => ({
+          base: `강화확률 +${2 * level}%`,
+          preview: isMax ? '' : '(+2%)'
+        })
+      },
+      {
+        key: 'vanguardGrant',
+        levelId: 'rebirth-vanguard-grant-level',
+        costId: 'rebirth-vanguard-grant-cost',
+        effectId: 'rebirth-vanguard-grant-effect',
+        buttonId: 'rebirth-upgrade-vanguard-grant',
+        getEffectData: (level, isMax) => {
+          if (level < 1) {
+            return {
+              base: '환생 시 유닛 지급 없음',
+              preview: '(1단 유닛 10기 지급)'
+            };
+          }
+          return {
+            base: `환생 시 ${level}단 유닛 10기 지급`,
+            preview: isMax ? '' : '(+1단)'
+          };
+        }
+      },
+      {
+        key: 'pioneerSlots',
+        levelId: 'rebirth-pioneer-slots-level',
+        costId: 'rebirth-pioneer-slots-cost',
+        effectId: 'rebirth-pioneer-slots-effect',
+        buttonId: 'rebirth-upgrade-pioneer-slots',
+        getEffectData: (level, isMax) => ({
+          base: `기본 슬롯 +${2 * level}`,
+          preview: isMax ? '' : '(+2)'
+        })
+      }
+    ];
+
+    for (const binding of bindings) {
+      const rewardMeta = GAME_CONSTANTS.REBIRTH_REWARDS[binding.key];
+      if (!rewardMeta) {
+        continue;
+      }
+
+      const level = Math.max(0, Math.floor(rewards[binding.key] || 0));
+      const isMax = level >= rewardMeta.maxLevel;
+      const cost = GAME_CONSTANTS.getRebirthRewardCost(binding.key, level);
+
+      const levelEl = document.getElementById(binding.levelId);
+      if (levelEl) {
+        levelEl.textContent = `${level}/${rewardMeta.maxLevel}Lv`;
+      }
+
+      const costEl = document.getElementById(binding.costId);
+      if (costEl) {
+        costEl.textContent = isMax
+          ? '비용: 최대 레벨'
+          : `비용: ${this.formatAbcNumber(cost || 0)} ${GAME_CONSTANTS.REBIRTH_POINT_NAME}`;
+      }
+
+      const effectEl = document.getElementById(binding.effectId);
+      if (effectEl) {
+        const effectData = binding.getEffectData(level, isMax);
+        this.setTraitEffectText(effectEl, effectData.base, effectData.preview);
+      }
+
+      const buttonEl = document.getElementById(binding.buttonId);
+      if (buttonEl) {
+        buttonEl.disabled = rebirthDisabled || isMax;
+        buttonEl.title = rebirthDisabled ? GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE : '';
+      }
+    }
   }
 
   /**
@@ -1411,10 +1515,8 @@ class GameUI {
     }
 
     const canRecover = Boolean(state.emergencyRecoveryAvailable);
-    const recoveryGold = Math.max(1, Math.floor(Number(gameEngine.getEmergencyRecoveryGold?.()) || 0));
     panelEl.classList.toggle('active', canRecover);
     buttonEl.disabled = !canRecover;
-    buttonEl.textContent = `긴급 복구 (${this.formatAbcNumber(recoveryGold)}골드 지급)`;
   }
 
   /**
@@ -2375,6 +2477,26 @@ class GameUI {
       resetEnhancePlus3Btn.addEventListener('click', () => this.onResetTrait('enhanceProbabilityPlus3Upgrade'));
     }
 
+    const upgradeSlotBtn = document.getElementById('upgrade-slot-capacity');
+    if (upgradeSlotBtn) {
+      upgradeSlotBtn.addEventListener('click', () => this.onUpgradeTrait('slotCapacityUpgrade'));
+    }
+
+    const resetSlotBtn = document.getElementById('reset-slot-capacity');
+    if (resetSlotBtn) {
+      resetSlotBtn.addEventListener('click', () => this.onResetTrait('slotCapacityUpgrade'));
+    }
+
+    const upgradeAutomationSpeedBtn = document.getElementById('upgrade-automation-speed');
+    if (upgradeAutomationSpeedBtn) {
+      upgradeAutomationSpeedBtn.addEventListener('click', () => this.onUpgradeTrait('automationSpeedUpgrade'));
+    }
+
+    const resetAutomationSpeedBtn = document.getElementById('reset-automation-speed');
+    if (resetAutomationSpeedBtn) {
+      resetAutomationSpeedBtn.addEventListener('click', () => this.onResetTrait('automationSpeedUpgrade'));
+    }
+
     const traitPresetButtons = document.querySelectorAll('[data-trait-preset]');
     traitPresetButtons.forEach((button) => {
       button.addEventListener('click', () => {
@@ -2408,6 +2530,11 @@ class GameUI {
       emergencyRecoveryBtn.addEventListener('click', () => this.onEmergencyRecovery());
     }
 
+    const rebirthButton = document.getElementById('rebirth-button');
+    if (rebirthButton) {
+      rebirthButton.addEventListener('click', () => this.onPerformRebirth());
+    }
+
     const firstRebirthBtn = document.getElementById('rebirth-first-button');
     if (firstRebirthBtn) {
       firstRebirthBtn.addEventListener('click', () => this.onPerformFirstRebirthUnlock());
@@ -2416,6 +2543,31 @@ class GameUI {
     const secondRebirthBtn = document.getElementById('rebirth-second-button');
     if (secondRebirthBtn) {
       secondRebirthBtn.addEventListener('click', () => this.onPerformSecondRebirthUnlock());
+    }
+
+    const rebirthAutomationStartPassBtn = document.getElementById('rebirth-upgrade-automation-start-pass');
+    if (rebirthAutomationStartPassBtn) {
+      rebirthAutomationStartPassBtn.addEventListener('click', () => this.onUpgradeRebirthReward('automationStartPass'));
+    }
+
+    const rebirthTrainingManualBtn = document.getElementById('rebirth-upgrade-training-manual');
+    if (rebirthTrainingManualBtn) {
+      rebirthTrainingManualBtn.addEventListener('click', () => this.onUpgradeRebirthReward('trainingManual'));
+    }
+
+    const rebirthBreakthroughMemoryBtn = document.getElementById('rebirth-upgrade-breakthrough-memory');
+    if (rebirthBreakthroughMemoryBtn) {
+      rebirthBreakthroughMemoryBtn.addEventListener('click', () => this.onUpgradeRebirthReward('breakthroughMemory'));
+    }
+
+    const rebirthVanguardGrantBtn = document.getElementById('rebirth-upgrade-vanguard-grant');
+    if (rebirthVanguardGrantBtn) {
+      rebirthVanguardGrantBtn.addEventListener('click', () => this.onUpgradeRebirthReward('vanguardGrant'));
+    }
+
+    const rebirthPioneerSlotsBtn = document.getElementById('rebirth-upgrade-pioneer-slots');
+    if (rebirthPioneerSlotsBtn) {
+      rebirthPioneerSlotsBtn.addEventListener('click', () => this.onUpgradeRebirthReward('pioneerSlots'));
     }
 
     // 자동판매 버튼: 단수별 자동판매 토글 (5단~10단)
@@ -2621,13 +2773,6 @@ class GameUI {
       this.pulseTierRows(tier, 'fx-tier-sell');
       this.spawnBattleFloatText(`판매 +${this.formatAbcNumber(result.gainedExp)}EXP`, 'fx-sell');
       this.updateUI();
-      return;
-    }
-
-    if (result.reason === 'SELL_TICKET_REQUIRED') {
-      const requiredTicket = Math.max(1, Math.floor(Number(result.requiredTicket) || 1));
-      const currentTicket = Math.max(0, Math.floor(Number(result.currentTicket) || 0));
-      alert(`판매권이 부족합니다. 필요 ${requiredTicket}, 보유 ${currentTicket}`);
     }
   }
 
@@ -2931,7 +3076,53 @@ class GameUI {
   }
 
   /**
-   * 소프트락 복구: 최소 1단 구매 가능 골드 지급
+   * 환생 실행
+   */
+  onPerformRebirth() {
+    if (!GAME_CONSTANTS.REBIRTH_ENABLED) {
+      alert(GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE);
+      return;
+    }
+
+    const confirmed = confirm('환생하면 현재 유닛/골드/특성 진행도가 초기화됩니다.\n환생하시겠습니까?');
+    if (!confirmed) {
+      return;
+    }
+
+    // 환생 직후 첫 틱에서 기존 자동화가 동작하지 않도록 선제적으로 OFF 처리
+    this.resetAllAutomationState();
+
+    const result = gameEngine.performRebirth();
+    if (result.success) {
+      alert(`${result.message}\n현재 보유: ${result.totalPoints} ${GAME_CONSTANTS.REBIRTH_POINT_NAME}`);
+      this.midBossRun = null;
+      this.updateUI();
+      return;
+    }
+
+    alert(result.message);
+  }
+
+  /**
+   * 환생 보상 업그레이드
+   */
+  onUpgradeRebirthReward(rewardKey) {
+    if (!GAME_CONSTANTS.REBIRTH_ENABLED) {
+      alert(GAME_CONSTANTS.REBIRTH_TEMP_DISABLED_MESSAGE);
+      return;
+    }
+
+    const result = gameEngine.upgradeRebirthReward(rewardKey);
+    if (!result.success) {
+      alert(result.message);
+      return;
+    }
+
+    this.updateUI();
+  }
+
+  /**
+   * 소프트락 복구: 10골드 지급
    */
   onEmergencyRecovery() {
     const result = gameEngine.applyEmergencyRecovery();
@@ -3065,12 +3256,8 @@ class GameUI {
         this.timeScale = this.availableTimeScales.includes(savedScale) ? savedScale : 1;
         this.activeTraitPreset = Math.min(5, Math.max(1, Number.parseInt(state.activeTraitPreset, 10) || 1));
         this.unitActionFxEnabled = state.unitActionFxEnabled !== false;
-        const hasFirstFlag = Object.prototype.hasOwnProperty.call(state, 'firstRebirthCompleted');
-        const hasSecondFlag = Object.prototype.hasOwnProperty.call(state, 'secondRebirthCompleted');
-        const inferredFirstCompleted = hasFirstFlag ? Boolean(state.firstRebirthCompleted) : savedScale >= 2;
-        const inferredSecondCompleted = hasSecondFlag ? Boolean(state.secondRebirthCompleted) : savedScale >= 3;
-        this.firstRebirthCompleted = inferredFirstCompleted || inferredSecondCompleted;
-        this.secondRebirthCompleted = inferredSecondCompleted;
+        this.firstRebirthCompleted = Boolean(state.firstRebirthCompleted);
+        this.secondRebirthCompleted = Boolean(state.secondRebirthCompleted);
         this.updateAutomationButtons();
         this.updateTraitPresetButtons();
         this.updateUnitActionFxUi();
