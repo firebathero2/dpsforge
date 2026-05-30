@@ -24,7 +24,7 @@ class GameUI {
     this.wakeLockRequested = false;
     this.timeScale = 1;
     this.unitActionFxEnabled = true;
-    this.availableTimeScales = [1, 2, 3];
+    this.availableTimeScales = [1, 2, 3.5];
     this.firstRebirthCompleted = false;
     this.secondRebirthCompleted = false;
     this.lastLoopTimestampMs = null;
@@ -71,6 +71,7 @@ class GameUI {
       }
     ];
     this.midBossRun = null;
+    this.bossRun = null;
     this.isHardResetInProgress = false;
     this.hudNumericSnapshot = {
       gold: Number(gameEngine?.state?.gold) || 0,
@@ -111,15 +112,17 @@ class GameUI {
     this.initializeTierTables();
     this.bindEvents();
     this.bindLayoutNavigation();
-    this.startGameLoop();
-    this.handleGameRestore();
-    this.loadAutomationState();
-    this.loadTraitPresetState();
+    // 초기화 단계에서 예외가 나더라도 설정 패널 상태 문구가 기본값에 멈추지 않도록
+    // 저장 복구보다 설정 UI 초기화를 먼저 실행한다.
     this.initWakeLockSettings();
     this.initTimeScaleSettings();
     this.initUnitActionFxSettings();
     this.initDebugPanel();
+    this.handleGameRestore();
+    this.loadAutomationState();
+    this.loadTraitPresetState();
     this.initTutorialGuide();
+    this.startGameLoop();
   }
   
   /**
@@ -159,6 +162,7 @@ class GameUI {
     this.updateInventoryDisplay();
     this.updateDeployedDisplay();
     this.updateMidBossPanel();
+    this.updateBossPanel();
     this.updateEmergencyRecoveryPanel();
     this.updateAutomationButtons();
     this.updateTraitPresetButtons();
@@ -582,7 +586,7 @@ class GameUI {
     if (Math.abs(numeric - 2) < 0.001) {
       return this.firstRebirthCompleted;
     }
-    if (Math.abs(numeric - 3) < 0.001) {
+    if (Math.abs(numeric - 3.5) < 0.001) {
       return this.secondRebirthCompleted;
     }
     return false;
@@ -607,7 +611,7 @@ class GameUI {
       button.disabled = !isUnlocked;
       if (!isUnlocked && Math.abs(value - 2) < 0.001) {
         button.title = '1차 환생 보상으로 해금됩니다.';
-      } else if (!isUnlocked && Math.abs(value - 3) < 0.001) {
+      } else if (!isUnlocked && Math.abs(value - 3.5) < 0.001) {
         button.title = '2차 환생 보상으로 해금됩니다.';
       } else {
         button.title = '';
@@ -681,7 +685,7 @@ class GameUI {
 
     if (secondBtn) {
       secondBtn.title = this.firstRebirthCompleted
-        ? '조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금'
+        ? '조건 : 20단 보유, 10레벨 달성\n보상 : 3.5배속 해금'
         : '선행 조건 : 1차 환생 완료';
       if (this.secondRebirthCompleted) {
         secondBtn.hidden = true;
@@ -725,6 +729,7 @@ class GameUI {
     }
 
     this.midBossRun = null;
+    this.bossRun = null;
     this.updateTimeScaleUi();
     this.updateRebirthActionButtons();
     this.saveAutomationState();
@@ -763,11 +768,12 @@ class GameUI {
     }
 
     this.midBossRun = null;
+    this.bossRun = null;
     this.updateTimeScaleUi();
     this.updateRebirthActionButtons();
     this.saveAutomationState();
     this.updateUI();
-    alert('2차 환생 완료! 보상으로 3배속이 해금되었습니다.');
+    alert('2차 환생 완료! 보상으로 3.5배속이 해금되었습니다.');
   }
 
   updateUnitActionFxUi() {
@@ -882,6 +888,9 @@ class GameUI {
         normalizedTier
       )
       : 0;
+    const bossPlus1Bonus = traitBonusEnabled
+      ? Math.max(0, Number(state?.boss?.plus1EnhanceBonusRate) || 0)
+      : 0;
     const breakthroughLevel = Math.max(0, Math.floor(state?.rebirth?.rewards?.breakthroughMemory || 0));
     const bestTierReached = Math.max(1, Math.floor(state?.rebirth?.bestTierReached || 1));
     const breakthroughBonus = normalizedTier <= bestTierReached
@@ -897,7 +906,7 @@ class GameUI {
     let basePlus2Rate = rawBasePlus2Rate;
     let basePlus3Rate = rawBasePlus3Rate;
 
-    let rawPlus1Rate = Math.max(0, basePlus1Rate + plus1TraitBonus + breakthroughBonus);
+    let rawPlus1Rate = Math.max(0, basePlus1Rate + plus1TraitBonus + breakthroughBonus + bossPlus1Bonus);
     let rawPlus2Rate = Math.max(0, basePlus2Rate + plus2TraitBonus);
     let rawPlus3Rate = Math.max(0, basePlus3Rate + plus3TraitBonus);
 
@@ -989,10 +998,10 @@ class GameUI {
           : '';
         const secondRebirthAction = tier === 20
           ? `<span class="rebirth-action-wrap">
-              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3배속 해금">2차 환생</button>
+              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3.5배속 해금">2차 환생</button>
               <span class="price-tooltip rebirth-info-tooltip" tabindex="0" aria-label="2차 환생 안내">
                 !
-                <span class="price-tooltip-text">선행 : 1차 환생 완료\n조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금</span>
+                <span class="price-tooltip-text">선행 : 1차 환생 완료\n조건 : 20단 보유, 10레벨 달성\n보상 : 3.5배속 해금</span>
               </span>
             </span>`
           : '';
@@ -1009,7 +1018,7 @@ class GameUI {
       inventoryRows.push(`
         <tr>
           <td>${tier}단</td>
-          <td>${this.formatAbcNumber(dps)}</td>
+          <td><span id="inventory-tier-${tier}-dps-base">${this.formatAbcNumber(dps)}</span><span class="trait-preview" id="inventory-tier-${tier}-dps-bonus"></span></td>
           <td id="inventory-tier-${tier}-count">0</td>
           <td>${buyCell}</td>
           <td><button class="btn-sm" id="deploy-tier-${tier}">배치</button></td>
@@ -1339,6 +1348,8 @@ class GameUI {
 
     this.updateHudValue('trait-points', state.traitPoints);
     this.updateHudValue('midboss-level', state.midBoss?.level || 0);
+    this.updateHudValue('sell-ticket-count', Math.max(0, Math.floor(Number(state.sellTicket) || 0)));
+    this.updateHudValue('total-attack-multiplier', `x${Math.max(1, Number(state.totalAttackPowerMultiplier) || 1).toFixed(2)}`);
     this.updateHudValue('slot-population', `${state.deployedCount} / ${state.slotCap}`);
     const automationStartPassLevel = Math.max(0, Math.floor(state.rebirth?.rewards?.automationStartPass || 0));
     const automationSpeedRate = GAME_CONSTANTS.AUTO_BASE_ACTIONS_PER_SEC
@@ -1638,7 +1649,11 @@ class GameUI {
       return actors;
     }
 
-    const attackMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(state.traitLevels?.attackPowerUpgrade || 0);
+    const attackMultiplier = Math.max(
+      1,
+      Number(state.totalAttackPowerMultiplier)
+      || GAME_CONSTANTS.getAttackPowerMultiplier(state.traitLevels?.attackPowerUpgrade || 0)
+    );
     let actorIndex = 0;
 
     for (let tier = GAME_CONSTANTS.MAX_TIER; tier >= 1; tier--) {
@@ -2060,6 +2075,20 @@ class GameUI {
         countEl.textContent = this.formatAbcNumber(count);
       }
 
+      const dpsBaseEl = document.getElementById(`inventory-tier-${tier}-dps-base`);
+      const dpsBonusEl = document.getElementById(`inventory-tier-${tier}-dps-bonus`);
+      if (dpsBaseEl || dpsBonusEl) {
+        const baseDps = GAME_CONSTANTS.getDPS(tier);
+        const totalAttackMultiplier = Math.max(1, Number(state.totalAttackPowerMultiplier) || 1);
+        const bonusDps = Math.max(0, baseDps * (totalAttackMultiplier - 1));
+        if (dpsBaseEl) {
+          dpsBaseEl.textContent = this.formatAbcNumber(baseDps);
+        }
+        if (dpsBonusEl) {
+          dpsBonusEl.textContent = bonusDps > 0 ? `(+${this.formatAbcNumber(bonusDps, { smallAsInteger: false })})` : '';
+        }
+      }
+
       if (tier < GAME_CONSTANTS.MAX_TIER) {
         const probabilityEl = document.getElementById(`upgrade-probability-tier-${tier}`);
         if (probabilityEl) {
@@ -2164,9 +2193,217 @@ class GameUI {
       cloneDpsEl.textContent = this.formatAbcNumber(snapshot.cloneTotalDps);
     }
 
+    const rewardEl = document.getElementById('midboss-reward-text');
+    if (rewardEl) {
+      const rewardText = `클리어 보상: 사냥터 슬롯 +${GAME_CONSTANTS.MID_BOSS_SLOT_REWARD_PER_CLEAR}`;
+      rewardEl.textContent = snapshot.isCompleted
+        ? `${rewardText} (모든 단계 완료)`
+        : rewardText;
+    }
+
     this.renderMidBossCloneList(snapshot.clones);
     this.updateMidBossRunAnimation(snapshot);
     this.updateMidBossStartButton(snapshot);
+  }
+
+  /**
+   * 보스 패널 업데이트 및 도전 애니메이션 처리
+   */
+  updateBossPanel() {
+    const snapshot = gameEngine.getBossChallengeSnapshot();
+
+    const stageEl = document.getElementById('boss-current-stage');
+    if (stageEl) {
+      stageEl.textContent = snapshot.isCompleted
+        ? `${snapshot.maxStages}/${snapshot.maxStages} (완료)`
+        : `${snapshot.level}/${snapshot.maxStages}`;
+    }
+
+    const dpmCutEl = document.getElementById('boss-dpm-cut');
+    if (dpmCutEl) {
+      if (snapshot.isCompleted) {
+        dpmCutEl.textContent = '-';
+      } else if (!snapshot.isNextStageImplemented || !Number.isFinite(snapshot.dpmCut)) {
+        dpmCutEl.textContent = '준비 중';
+      } else {
+        dpmCutEl.textContent = this.formatAbcNumber(snapshot.dpmCut);
+      }
+    }
+
+    const cloneDpmEl = document.getElementById('boss-clone-dpm');
+    if (cloneDpmEl) {
+      cloneDpmEl.textContent = this.formatAbcNumber(snapshot.cloneTotalDpm);
+    }
+
+    const rewardEl = document.getElementById('boss-reward-text');
+    if (rewardEl) {
+      const stageOneRewardText = `1단계 보상: +1강 +${(GAME_CONSTANTS.BOSS_STAGE1_PLUS1_BONUS_RATE * 100).toFixed(1)}%p, 판매권 +${GAME_CONSTANTS.BOSS_STAGE1_SELL_TICKET_REWARD}`;
+      const stageTwoRewardText = `2단계 보상: +1강 +${(GAME_CONSTANTS.BOSS_STAGE2_PLUS1_BONUS_RATE * 100).toFixed(1)}%p, 판매권 +${GAME_CONSTANTS.BOSS_STAGE2_SELL_TICKET_REWARD}, 공격력 +${(GAME_CONSTANTS.BOSS_STAGE2_ATTACK_BONUS_RATE * 100).toFixed(0)}%`;
+      const stageThreeRewardText = `3단계 보상: +1강 +${(GAME_CONSTANTS.BOSS_STAGE3_PLUS1_BONUS_RATE * 100).toFixed(1)}%p, 판매권 +${GAME_CONSTANTS.BOSS_STAGE3_SELL_TICKET_REWARD}, 경험치 +${(GAME_CONSTANTS.BOSS_STAGE3_EXP_BONUS_RATE * 100).toFixed(0)}%`;
+      const stageFourRewardText = `4단계 보상: +1강 +${(GAME_CONSTANTS.BOSS_STAGE4_PLUS1_BONUS_RATE * 100).toFixed(1)}%p, 판매권 +${GAME_CONSTANTS.BOSS_STAGE4_SELL_TICKET_REWARD}, 공격력 +${(GAME_CONSTANTS.BOSS_STAGE4_ATTACK_BONUS_RATE * 100).toFixed(0)}%, 경험치 +${(GAME_CONSTANTS.BOSS_STAGE4_EXP_BONUS_RATE * 100).toFixed(0)}%`;
+
+      if (snapshot.level >= 4) {
+        rewardEl.textContent = `${stageFourRewardText} (획득 완료)`;
+      } else if (snapshot.level >= 3) {
+        rewardEl.textContent = snapshot.isNextStageImplemented ? stageFourRewardText : `${stageFourRewardText} (준비 중)`;
+      } else if (snapshot.level >= 2) {
+        rewardEl.textContent = snapshot.isNextStageImplemented ? stageThreeRewardText : `${stageThreeRewardText} (준비 중)`;
+      } else if (snapshot.level >= 1) {
+        rewardEl.textContent = snapshot.isNextStageImplemented ? stageTwoRewardText : `${stageTwoRewardText} (준비 중)`;
+      } else {
+        rewardEl.textContent = stageOneRewardText;
+      }
+    }
+
+    this.renderBossCloneList(snapshot.clones);
+    this.updateBossRunAnimation(snapshot);
+    this.updateBossStartButton(snapshot);
+  }
+
+  renderBossCloneList(clones) {
+    const listEl = document.getElementById('boss-clone-list');
+    if (!listEl) {
+      return;
+    }
+
+    if (clones.length < 1) {
+      listEl.innerHTML = '<div class="midboss-clone-item">출전 가능한 26단 이상 유닛이 없습니다.</div>';
+      return;
+    }
+
+    listEl.innerHTML = clones
+      .map((clone, index) => `
+        <div class="midboss-clone-item">
+          <span>#${index + 1} 클론</span>
+          <span>${clone.tier}단</span>
+          <strong>DPM ${this.formatAbcNumber(clone.dpm)}</strong>
+        </div>
+      `)
+      .join('');
+  }
+
+  updateBossRunAnimation(snapshot) {
+    const progressEl = document.getElementById('boss-progress-fill');
+    const timerEl = document.getElementById('boss-timer');
+    const liveDpmEl = document.getElementById('boss-live-dpm');
+    const avgDpmEl = document.getElementById('boss-avg-dpm');
+    const statusTextEl = document.getElementById('boss-status-text');
+
+    if (!progressEl || !timerEl || !liveDpmEl || !avgDpmEl || !statusTextEl) {
+      return;
+    }
+
+    if (!this.bossRun) {
+      progressEl.style.width = '0%';
+      timerEl.textContent = `0.0 / ${snapshot.durationSec.toFixed(1)}초`;
+      liveDpmEl.textContent = this.formatAbcNumber(snapshot.cloneTotalDpm);
+      avgDpmEl.textContent = this.formatAbcNumber(0);
+      if (snapshot.isCompleted) {
+        statusTextEl.textContent = '완료';
+      } else if (!snapshot.isNextStageImplemented) {
+        statusTextEl.textContent = '다음 스테이지 준비 중';
+      } else {
+        statusTextEl.textContent = '대기 중';
+      }
+      return;
+    }
+
+    const nowMs = performance.now();
+    const deltaRealSec = Math.max(0, (nowMs - this.bossRun.lastTickMs) / 1000);
+    this.bossRun.lastTickMs = nowMs;
+
+    const scaledDeltaSec = deltaRealSec * this.timeScale;
+    this.bossRun.elapsedBattleSec = Math.min(this.bossRun.durationSec, this.bossRun.elapsedBattleSec + scaledDeltaSec);
+    this.bossRun.accumulatedDamage += (this.bossRun.liveDpm * scaledDeltaSec) / 60;
+
+    const progress = Math.min(1, this.bossRun.elapsedBattleSec / this.bossRun.durationSec);
+    const averageDpm = this.bossRun.accumulatedDamage / (this.bossRun.durationSec / 60);
+
+    progressEl.style.width = `${(progress * 100).toFixed(1)}%`;
+    timerEl.textContent = `${this.bossRun.elapsedBattleSec.toFixed(1)} / ${this.bossRun.durationSec.toFixed(1)}초`;
+    liveDpmEl.textContent = this.formatAbcNumber(this.bossRun.liveDpm);
+    avgDpmEl.textContent = this.formatAbcNumber(averageDpm);
+    statusTextEl.textContent = `도전 중... (${this.formatTimeScaleLabel(this.timeScale)})`;
+
+    if (this.bossRun.elapsedBattleSec >= this.bossRun.durationSec) {
+      const result = gameEngine.resolveBossChallenge(averageDpm);
+      if (result.success) {
+        this.pulseBossCard('fx-midboss-success', 760);
+        this.spawnBattleFloatText('보스 성공!', 'fx-boss');
+        const bonusPct = ((Number(result.plus1BonusRateReward) || 0) * 100).toFixed(1);
+        const attackPct = ((Number(result.attackPowerBonusRateReward) || 0) * 100).toFixed(0);
+        const expPct = ((Number(result.expGainBonusRateReward) || 0) * 100).toFixed(0);
+        const rewards = [
+          `+1강 ${bonusPct}%p`,
+          `판매권 +${result.sellTicketReward}`
+        ];
+        if (Number(result.attackPowerBonusRateReward) > 0) {
+          rewards.push(`공격력 +${attackPct}%`);
+        }
+        if (Number(result.expGainBonusRateReward) > 0) {
+          rewards.push(`경험치 +${expPct}%`);
+        }
+        statusTextEl.textContent = `성공! ${rewards.join(', ')}`;
+      } else {
+        this.pulseBossCard('fx-midboss-fail', 500);
+        this.spawnBattleFloatText('보스 실패', 'fx-boss-fail');
+        if (result.isCompleted) {
+          statusTextEl.textContent = '완료';
+        } else {
+          statusTextEl.textContent = `실패 (평균 ${this.formatAbcNumber(result.averageDpm)} / 컷 ${this.formatAbcNumber(result.dpmCut)})`;
+        }
+      }
+      this.bossRun = null;
+    }
+  }
+
+  updateBossStartButton(snapshot) {
+    const startBtn = document.getElementById('boss-start-btn');
+    if (!startBtn) {
+      return;
+    }
+
+    if (this.bossRun) {
+      startBtn.disabled = true;
+      startBtn.textContent = '도전 진행 중...';
+      return;
+    }
+
+    if (snapshot.isCompleted) {
+      startBtn.disabled = true;
+      startBtn.textContent = '보스 완료';
+      return;
+    }
+
+    if (!snapshot.isNextStageImplemented) {
+      startBtn.disabled = true;
+      startBtn.textContent = '준비 중';
+      return;
+    }
+
+    if (snapshot.clones.length < 1) {
+      startBtn.disabled = true;
+      startBtn.textContent = '26단+ 유닛 부족';
+      return;
+    }
+
+    startBtn.disabled = false;
+    startBtn.textContent = '보스 도전';
+  }
+
+  pulseBossCard(className, durationMs = 600) {
+    const card = document.querySelector('.boss-battle-card');
+    if (!card) {
+      return;
+    }
+
+    card.classList.remove(className);
+    void card.offsetWidth;
+    card.classList.add(className);
+
+    setTimeout(() => {
+      card.classList.remove(className);
+    }, durationMs);
   }
 
   renderMidBossCloneList(clones) {
@@ -2398,6 +2635,11 @@ class GameUI {
       midBossStartBtn.addEventListener('click', () => this.onStartMidBossChallenge());
     }
 
+    const bossStartBtn = document.getElementById('boss-start-btn');
+    if (bossStartBtn) {
+      bossStartBtn.addEventListener('click', () => this.onStartBossChallenge());
+    }
+
     const hardResetBtn = document.getElementById('hard-reset-button');
     if (hardResetBtn) {
       hardResetBtn.addEventListener('click', () => this.onHardReset());
@@ -2510,6 +2752,33 @@ class GameUI {
 
     this.pulseMidBossCard('fx-midboss-start', 620);
     this.spawnBattleFloatText('중간보스 도전 시작', 'fx-boss');
+  }
+
+  /**
+   * 보스 도전 시작
+   */
+  onStartBossChallenge() {
+    if (this.bossRun) {
+      return;
+    }
+
+    const snapshot = gameEngine.getBossChallengeSnapshot();
+    if (!snapshot.canChallenge) {
+      return;
+    }
+
+    const nowMs = performance.now();
+    this.bossRun = {
+      startedAtMs: nowMs,
+      lastTickMs: nowMs,
+      elapsedBattleSec: 0,
+      durationSec: snapshot.durationSec,
+      liveDpm: snapshot.cloneTotalDpm,
+      accumulatedDamage: 0
+    };
+
+    this.pulseBossCard('fx-midboss-start', 620);
+    this.spawnBattleFloatText('보스 도전 시작', 'fx-boss');
   }
 
   /**
@@ -3068,6 +3337,7 @@ class GameUI {
         const hasFirstFlag = Object.prototype.hasOwnProperty.call(state, 'firstRebirthCompleted');
         const hasSecondFlag = Object.prototype.hasOwnProperty.call(state, 'secondRebirthCompleted');
         const inferredFirstCompleted = hasFirstFlag ? Boolean(state.firstRebirthCompleted) : savedScale >= 2;
+        // 레거시 3x 저장값도 2차 환생 완료로 인식해 3.5x 해금으로 자연 이관
         const inferredSecondCompleted = hasSecondFlag ? Boolean(state.secondRebirthCompleted) : savedScale >= 3;
         this.firstRebirthCompleted = inferredFirstCompleted || inferredSecondCompleted;
         this.secondRebirthCompleted = inferredSecondCompleted;
@@ -3095,15 +3365,31 @@ class GameUI {
    * 게임 복구 및 오프라인 보상 처리
    */
   handleGameRestore() {
-    const loaded = gameEngine.load();
-    if (loaded) {
-      const offlineReward = gameEngine.handleGameRestore();
-      if (offlineReward > 0) {
-        console.log(`Offline reward: ${offlineReward} gold`);
-        alert(`Welcome back! You earned ${this.formatAbcNumber(offlineReward)} gold while offline.`);
+    try {
+      const loaded = gameEngine.load();
+      if (loaded) {
+        const offlineReward = gameEngine.handleGameRestore();
+        if (offlineReward > 0) {
+          console.log(`Offline reward: ${offlineReward} gold`);
+          alert(`Welcome back! You earned ${this.formatAbcNumber(offlineReward)} gold while offline.`);
+        }
       }
+    } catch (error) {
+      console.error('Failed during restore flow:', error);
     }
-    this.updateUI();
+
+    try {
+      this.updateUI();
+    } catch (error) {
+      console.error('Failed to render UI after restore:', error);
+    }
+
+    // 렌더 실패가 있었더라도 기본 텍스트("지원 여부 확인 중...")에 멈추지 않도록 강제 동기화
+    try {
+      this.updateWakeLockUi();
+    } catch (error) {
+      console.error('Failed to sync wake lock UI:', error);
+    }
   }
 }
 

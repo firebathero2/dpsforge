@@ -224,8 +224,14 @@ class GameEngine {
   /**
    * 배치 유닛 DPS를 액트(1~25 / 26~최대)로 분리 계산
    */
+  getTotalAttackPowerMultiplier() {
+    const traitMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade);
+    const bossAttackBonusRate = Math.max(0, Number(this.state.boss?.attackPowerBonusRate) || 0);
+    return traitMultiplier + bossAttackBonusRate;
+  }
+
   getSplitDpsByAct() {
-    const attackPowerMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade);
+    const attackPowerMultiplier = this.getTotalAttackPowerMultiplier();
     let act1RawDps = 0;
     let act2RawDps = 0;
 
@@ -451,6 +457,9 @@ class GameEngine {
         tier
       )
       : 0;
+    const bossPlus1Bonus = traitBonusEnabled
+      ? Math.max(0, Number(this.state.boss?.plus1EnhanceBonusRate) || 0)
+      : 0;
     const plus2TraitBonus = traitBonusEnabled
       ? GAME_CONSTANTS.getEnhanceProbabilityBonus(
         this.state.traitLevels.enhanceProbabilityPlus2Upgrade,
@@ -471,13 +480,13 @@ class GameEngine {
     const basePlus2Rate = basePlus1Rate * 0.1;
     const basePlus3Rate = basePlus1Rate * 0.01;
 
-    let rawPlus1Rate = Math.max(0, basePlus1Rate + plus1TraitBonus);
+    let rawPlus1Rate = Math.max(0, basePlus1Rate + plus1TraitBonus + bossPlus1Bonus);
     let rawPlus2Rate = Math.max(0, basePlus2Rate + plus2TraitBonus);
     let rawPlus3Rate = Math.max(0, basePlus3Rate + plus3TraitBonus);
 
-    // 35단: +3강은 발생하지 않고 +1강으로 편입
+    // 35단: +3강은 발생하지 않고 +2강으로 편입
     if (tier === 35) {
-      rawPlus1Rate += rawPlus3Rate;
+      rawPlus2Rate += rawPlus3Rate;
       rawPlus3Rate = 0;
     }
 
@@ -574,7 +583,8 @@ class GameEngine {
     }
 
     const expPerUnit = GAME_CONSTANTS.getSellExpByTier(tier);
-    const totalExp = Math.floor(expPerUnit * quantity);
+    const expGainMultiplier = 1 + Math.max(0, Number(this.state.boss?.expGainBonusRate) || 0);
+    const totalExp = Math.floor(expPerUnit * quantity * expGainMultiplier);
 
     this.state.inventory[tier] -= quantity;
     const levelUpResult = this.addCharacterExp(totalExp);
@@ -793,7 +803,7 @@ class GameEngine {
     const maxChallenges = GAME_CONSTANTS.MID_BOSS_MAX_CHALLENGES;
     const isCompleted = level >= maxChallenges;
     const dpsCut = GAME_CONSTANTS.getMidBossDpsCut(level);
-    const attackPowerMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade || 0);
+    const attackPowerMultiplier = this.getTotalAttackPowerMultiplier();
     const clones = this.getMidBossCloneUnits();
     const cloneTotalDps = clones.reduce((sum, clone) => sum + (clone.baseDps * attackPowerMultiplier), 0);
 
@@ -810,6 +820,167 @@ class GameEngine {
         tier: clone.tier,
         dps: Number((clone.baseDps * attackPowerMultiplier).toFixed(2))
       }))
+    };
+  }
+
+  /**
+   * 보스 도전에 사용될 상위 클론 유닛 계산 (26단 이상만 사용)
+   */
+  getBossCloneUnits(limit = GAME_CONSTANTS.BOSS_CLONE_COUNT) {
+    const clones = [];
+
+    for (let tier = GAME_CONSTANTS.MAX_TIER; tier >= GAME_CONSTANTS.BOSS_MIN_TIER && clones.length < limit; tier--) {
+      const totalOwned = (this.state.inventory[tier] || 0) + (this.state.deployed[tier] || 0);
+      if (totalOwned < 1) {
+        continue;
+      }
+
+      const cloneCount = Math.min(totalOwned, limit - clones.length);
+      for (let i = 0; i < cloneCount; i++) {
+        clones.push({ tier, baseDps: GAME_CONSTANTS.getDPS(tier) });
+      }
+    }
+
+    return clones;
+  }
+
+  /**
+   * 보스 도전 스냅샷
+   */
+  getBossChallengeSnapshot() {
+    const level = Math.max(0, Math.floor(Number(this.state.boss?.level) || 0));
+    const maxStages = GAME_CONSTANTS.BOSS_MAX_STAGES;
+    const implementedStages = GAME_CONSTANTS.BOSS_IMPLEMENTED_STAGES;
+    const isCompleted = level >= maxStages;
+    const isNextStageImplemented = level < implementedStages;
+    const dpmCut = isNextStageImplemented ? GAME_CONSTANTS.getBossDpmCut(level) : null;
+
+    const attackPowerMultiplier = this.getTotalAttackPowerMultiplier();
+    const clones = this.getBossCloneUnits();
+    const cloneTotalDps = clones.reduce((sum, clone) => sum + (clone.baseDps * attackPowerMultiplier), 0);
+    const cloneTotalDpm = cloneTotalDps * 60;
+
+    return {
+      level,
+      maxStages,
+      implementedStages,
+      remainingStages: Math.max(0, maxStages - level),
+      isCompleted,
+      isNextStageImplemented,
+      canChallenge: !isCompleted && isNextStageImplemented && clones.length > 0 && Number.isFinite(dpmCut),
+      dpmCut,
+      cloneTotalDpm,
+      durationSec: GAME_CONSTANTS.BOSS_CHALLENGE_DURATION_SEC,
+      clones: clones.map((clone) => ({
+        tier: clone.tier,
+        dpm: Number((clone.baseDps * attackPowerMultiplier * 60).toFixed(2))
+      }))
+    };
+  }
+
+  /**
+   * 보스 도전 결과 확정
+   */
+  resolveBossChallenge(averageDpm) {
+    const snapshot = this.getBossChallengeSnapshot();
+
+    if (snapshot.isCompleted) {
+      return {
+        success: false,
+        reason: '보스 보상을 모두 획득했습니다. (완료)',
+        ...snapshot,
+        averageDpm: Number(averageDpm.toFixed(2))
+      };
+    }
+
+    if (!snapshot.isNextStageImplemented) {
+      return {
+        success: false,
+        reason: '다음 보스 스테이지는 준비 중입니다.',
+        ...snapshot,
+        averageDpm: Number(averageDpm.toFixed(2))
+      };
+    }
+
+    if (snapshot.clones.length < 1) {
+      return {
+        success: false,
+        reason: '보스전에 출전할 유닛이 부족합니다. (26단 이상 필요)',
+        ...snapshot,
+        averageDpm: Number(averageDpm.toFixed(2))
+      };
+    }
+
+    const normalizedAverageDpm = Number(Math.max(0, averageDpm).toFixed(2));
+    const success = normalizedAverageDpm >= snapshot.dpmCut;
+
+    let plus1BonusRateReward = 0;
+    let sellTicketReward = 0;
+    let attackPowerBonusRateReward = 0;
+    let expGainBonusRateReward = 0;
+
+    if (success) {
+      const currentStage = this.state.boss.level || 0;
+      this.state.boss.level += 1;
+
+      if (currentStage === 0) {
+        plus1BonusRateReward = GAME_CONSTANTS.BOSS_STAGE1_PLUS1_BONUS_RATE;
+        sellTicketReward = GAME_CONSTANTS.BOSS_STAGE1_SELL_TICKET_REWARD;
+      } else if (currentStage === 1) {
+        plus1BonusRateReward = GAME_CONSTANTS.BOSS_STAGE2_PLUS1_BONUS_RATE;
+        sellTicketReward = GAME_CONSTANTS.BOSS_STAGE2_SELL_TICKET_REWARD;
+        attackPowerBonusRateReward = GAME_CONSTANTS.BOSS_STAGE2_ATTACK_BONUS_RATE;
+      } else if (currentStage === 2) {
+        plus1BonusRateReward = GAME_CONSTANTS.BOSS_STAGE3_PLUS1_BONUS_RATE;
+        sellTicketReward = GAME_CONSTANTS.BOSS_STAGE3_SELL_TICKET_REWARD;
+        expGainBonusRateReward = GAME_CONSTANTS.BOSS_STAGE3_EXP_BONUS_RATE;
+      } else if (currentStage === 3) {
+        plus1BonusRateReward = GAME_CONSTANTS.BOSS_STAGE4_PLUS1_BONUS_RATE;
+        sellTicketReward = GAME_CONSTANTS.BOSS_STAGE4_SELL_TICKET_REWARD;
+        attackPowerBonusRateReward = GAME_CONSTANTS.BOSS_STAGE4_ATTACK_BONUS_RATE;
+        expGainBonusRateReward = GAME_CONSTANTS.BOSS_STAGE4_EXP_BONUS_RATE;
+      }
+
+      if (plus1BonusRateReward > 0) {
+        this.state.boss.plus1EnhanceBonusRate = Math.max(0, Number(this.state.boss.plus1EnhanceBonusRate) || 0) + plus1BonusRateReward;
+      }
+      if (attackPowerBonusRateReward > 0) {
+        this.state.boss.attackPowerBonusRate = Math.max(0, Number(this.state.boss.attackPowerBonusRate) || 0) + attackPowerBonusRateReward;
+      }
+      if (expGainBonusRateReward > 0) {
+        this.state.boss.expGainBonusRate = Math.max(0, Number(this.state.boss.expGainBonusRate) || 0) + expGainBonusRateReward;
+      }
+      if (sellTicketReward > 0) {
+        this.state.sellTicket = Math.max(0, Math.floor(Number(this.state.sellTicket) || 0)) + sellTicketReward;
+        this.state.boss.totalSellTicketFromBoss = Math.max(0, Math.floor(Number(this.state.boss.totalSellTicketFromBoss) || 0)) + sellTicketReward;
+      }
+    }
+
+    const newLevel = this.state.boss.level || 0;
+    const completed = newLevel >= GAME_CONSTANTS.BOSS_MAX_STAGES;
+
+    this.state.boss.lastResult = {
+      success,
+      averageDpm: normalizedAverageDpm,
+      dpmCut: snapshot.dpmCut,
+      plus1BonusRateReward,
+      sellTicketReward,
+      attackPowerBonusRateReward,
+      expGainBonusRateReward,
+      completed,
+      timestamp: Date.now()
+    };
+
+    return {
+      success,
+      averageDpm: normalizedAverageDpm,
+      dpmCut: snapshot.dpmCut,
+      plus1BonusRateReward,
+      sellTicketReward,
+      attackPowerBonusRateReward,
+      expGainBonusRateReward,
+      newLevel,
+      completed
     };
   }
 
@@ -922,7 +1093,9 @@ class GameEngine {
       nextIncomeThreshold,
       requiredExpForNextLevel,
       slotCap: this.getCurrentSlotCap(),
+      totalAttackPowerMultiplier: this.getTotalAttackPowerMultiplier(),
       midBossCurrentDpsCut: GAME_CONSTANTS.getMidBossDpsCut(this.state.midBoss?.level || 0),
+      bossCurrentDpmCut: GAME_CONSTANTS.getBossDpmCut(this.state.boss?.level || 0),
       deployedCount: this.getDeployedUnitCount(),
       inventoryCount: this.getInventoryUnitCount(),
       emergencyRecoveryAvailable: this.canUseEmergencyRecovery()
@@ -958,6 +1131,9 @@ class GameEngine {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Saved game root is not a plain object');
+        }
         const parsedRebirth = parsed?.rebirth;
         const { rebirth: _unusedRebirth, ...parsedWithoutRebirth } = parsed || {};
         void _unusedRebirth;
@@ -994,6 +1170,22 @@ class GameEngine {
             legacyEnhanceLevel
           );
         const refundedRemovedTraitPoints = (removedAutomationLevel * 2) + (removedSlotLevel * 1);
+        const mergedInventoryPreview = {
+          ...initialState.inventory,
+          ...(parsedWithoutRebirth.inventory && typeof parsedWithoutRebirth.inventory === 'object' ? parsedWithoutRebirth.inventory : {})
+        };
+        const mergedDeployedPreview = {
+          ...initialState.deployed,
+          ...(parsedWithoutRebirth.deployed && typeof parsedWithoutRebirth.deployed === 'object' ? parsedWithoutRebirth.deployed : {})
+        };
+        const hasAnyPlayableProgress =
+          Math.max(0, Math.floor(Number(parsedWithoutRebirth.characterLevel) || 1)) > 1 ||
+          Math.max(0, Number(parsedWithoutRebirth.totalGoldEarned) || 0) > 0 ||
+          Object.values(mergedInventoryPreview).some((count) => Math.max(0, Math.floor(Number(count) || 0)) > 0) ||
+          Object.values(mergedDeployedPreview).some((count) => Math.max(0, Math.floor(Number(count) || 0)) > 0);
+        const tutorialFallbackState = hasAnyPlayableProgress
+          ? { ...initialState.tutorial, enabled: false, completed: true, beginnerBuffActive: false }
+          : { ...initialState.tutorial };
         const mergedState = {
           ...initialState,
           ...parsedWithoutRebirth,
@@ -1001,11 +1193,11 @@ class GameEngine {
           maxSlots: Number.isFinite(parsedWithoutRebirth.maxSlots) ? parsedWithoutRebirth.maxSlots : initialState.maxSlots,
           inventory: {
             ...initialState.inventory,
-            ...(parsedWithoutRebirth.inventory || {})
+            ...(parsedWithoutRebirth.inventory && typeof parsedWithoutRebirth.inventory === 'object' ? parsedWithoutRebirth.inventory : {})
           },
           deployed: {
             ...initialState.deployed,
-            ...(parsedWithoutRebirth.deployed || {})
+            ...(parsedWithoutRebirth.deployed && typeof parsedWithoutRebirth.deployed === 'object' ? parsedWithoutRebirth.deployed : {})
           },
           traitLevels: {
             ...initialState.traitLevels,
@@ -1014,7 +1206,11 @@ class GameEngine {
           },
           midBoss: {
             ...initialState.midBoss,
-            ...(parsedWithoutRebirth.midBoss || {})
+            ...(parsedWithoutRebirth.midBoss && typeof parsedWithoutRebirth.midBoss === 'object' ? parsedWithoutRebirth.midBoss : {})
+          },
+          boss: {
+            ...initialState.boss,
+            ...(parsedWithoutRebirth.boss && typeof parsedWithoutRebirth.boss === 'object' ? parsedWithoutRebirth.boss : {})
           },
           rebirth: {
             ...initialState.rebirth,
@@ -1027,7 +1223,7 @@ class GameEngine {
           tutorial: {
             ...(parsedWithoutRebirth && typeof parsedWithoutRebirth.tutorial === 'object'
               ? { ...initialState.tutorial, ...parsedWithoutRebirth.tutorial }
-              : { ...initialState.tutorial, enabled: false, completed: true, beginnerBuffActive: false })
+              : tutorialFallbackState)
           }
         };
 

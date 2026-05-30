@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DPS Forge - Idle Game</title>
-  <link rel="stylesheet" href="css/style.css?v=20260530-02">
+  <link rel="stylesheet" href="css/style.css?v=20260530-03">
 </head>
 <body>
   <div class="container">
@@ -71,6 +71,14 @@
               <span class="resource-value" id="midboss-level">0</span>
             </div>
             <div class="resource-item">
+              <span class="resource-label">판매권:</span>
+              <span class="resource-value" id="sell-ticket-count">0</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">총 공격력 배율:</span>
+              <span class="resource-value" id="total-attack-multiplier">x1.00</span>
+            </div>
+            <div class="resource-item">
               <span class="resource-label">
                 자동화 수치:
                 <span class="price-tooltip" tabindex="0" aria-label="자동화 수치 안내">
@@ -109,6 +117,7 @@
           <div class="panel-tabs" data-tab-group="battle">
             <button class="panel-tab active" data-tab-group="battle" data-tab="battle-hunt-tab">사냥터</button>
             <button class="panel-tab" data-tab-group="battle" data-tab="battle-midboss-tab">중간보스</button>
+            <button class="panel-tab" data-tab-group="battle" data-tab="battle-boss-tab">보스</button>
           </div>
 
           <div class="panel-tab-content active" data-tab-group-content="battle" id="battle-hunt-tab">
@@ -247,6 +256,7 @@
 
           <div class="panel-tab-content" data-tab-group-content="battle" id="battle-midboss-tab">
             <h3>중간보스 도전</h3>
+            <p class="setting-note reward-banner" id="midboss-reward-text">클리어 보상: 사냥터 슬롯 +5</p>
             <div class="resource-display">
               <div class="resource-item">
                 <span class="resource-label">중간보스 레벨</span>
@@ -280,6 +290,47 @@
 
             <div class="actions">
               <button class="btn" id="midboss-start-btn">중간보스 도전</button>
+            </div>
+          </div>
+
+          <div class="panel-tab-content" data-tab-group-content="battle" id="battle-boss-tab">
+            <h3>보스 도전</h3>
+            <p class="setting-note reward-banner" id="boss-reward-text">1단계 클리어 보상: +1강 강화확률 +1.5%p, 판매권 +3</p>
+            <div class="resource-display">
+              <div class="resource-item">
+                <span class="resource-label">보스 단계</span>
+                <span class="resource-value" id="boss-current-stage">0</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">현재 DPM 컷</span>
+                <span class="resource-value" id="boss-dpm-cut">4000</span>
+              </div>
+              <div class="resource-item">
+                <span class="resource-label">클론 합산 DPM</span>
+                <span class="resource-value" id="boss-clone-dpm">0.00</span>
+              </div>
+            </div>
+
+            <p class="setting-note">26단 이상 유닛 중 상위 4개 클론이 출전합니다. 배속이 적용되어 진행 시간이 빨라집니다.</p>
+
+            <div class="midboss-battle-card boss-battle-card">
+              <div class="midboss-gauge-head">
+                <span>실시간 DPM: <strong id="boss-live-dpm">0.00</strong></span>
+                <span>60초 평균 DPM: <strong id="boss-avg-dpm">0.00</strong></span>
+              </div>
+              <div class="midboss-progress-track" aria-label="보스 진행률">
+                <div class="midboss-progress-fill" id="boss-progress-fill"></div>
+              </div>
+              <div class="midboss-gauge-foot">
+                <span>진행 시간: <strong id="boss-timer">0.0 / 60.0초</strong></span>
+                <span id="boss-status-text">대기 중</span>
+              </div>
+            </div>
+
+            <div class="midboss-clone-list boss-clone-list" id="boss-clone-list"></div>
+
+            <div class="actions">
+              <button class="btn" id="boss-start-btn">보스 도전</button>
             </div>
           </div>
         </section>
@@ -550,7 +601,7 @@
           <div class="actions time-scale-actions">
             <button class="btn-sm time-scale-btn btn-toggle-on" data-time-scale="1">1x</button>
             <button class="btn-sm time-scale-btn" data-time-scale="2" disabled title="1차 환생 보상으로 해금됩니다.">2x</button>
-            <button class="btn-sm time-scale-btn" data-time-scale="3" disabled title="2차 환생 보상으로 해금됩니다.">3x</button>
+            <button class="btn-sm time-scale-btn" data-time-scale="3.5" disabled title="2차 환생 보상으로 해금됩니다.">3.5x</button>
           </div>
 
           <h3>관리 이펙트</h3>
@@ -601,8 +652,8 @@
   </div>
 
   <!-- 스크립트 -->
-  <script src="js/constants.js?v=20260530-02"></script>
-  <script src="js/gameLogic.js?v=20260530-02"></script>
-  <script src="js/ui.js?v=20260530-02"></script>
+  <script src="js/constants.js?v=20260530-03"></script>
+  <script src="js/gameLogic.js?v=20260530-03"></script>
+  <script src="js/ui.js?v=20260530-03"></script>
 </body>
 </html>

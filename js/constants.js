@@ -26,6 +26,26 @@ const GAME_CONSTANTS = {
   MID_BOSS_DPS_CUT_GROWTH: 2,
   MID_BOSS_MAX_CHALLENGES: 8,
   MID_BOSS_SLOT_REWARD_PER_CLEAR: 5,
+
+  // 보스전 시스템
+  BOSS_CLONE_COUNT: 4,
+  BOSS_MIN_TIER: 26,
+  BOSS_CHALLENGE_DURATION_SEC: 60,
+  BOSS_MAX_STAGES: 5,
+  BOSS_IMPLEMENTED_STAGES: 4,
+  BOSS_STAGE_DPM_CUTS: [4000, 25000, 175000, 525000],
+  BOSS_STAGE1_PLUS1_BONUS_RATE: 0.015,
+  BOSS_STAGE1_SELL_TICKET_REWARD: 3,
+  BOSS_STAGE2_PLUS1_BONUS_RATE: 0.03,
+  BOSS_STAGE2_SELL_TICKET_REWARD: 10,
+  BOSS_STAGE2_ATTACK_BONUS_RATE: 0.5,
+  BOSS_STAGE3_PLUS1_BONUS_RATE: 0.03,
+  BOSS_STAGE3_SELL_TICKET_REWARD: 30,
+  BOSS_STAGE3_EXP_BONUS_RATE: 0.25,
+  BOSS_STAGE4_PLUS1_BONUS_RATE: 0.03,
+  BOSS_STAGE4_SELL_TICKET_REWARD: 150,
+  BOSS_STAGE4_ATTACK_BONUS_RATE: 1.0,
+  BOSS_STAGE4_EXP_BONUS_RATE: 0.5,
   
   // 고단위 유닛 직접 구매 가격 (하위 자동구매 기준 50% 추가 프리미엄)
   HIGH_TIER_PURCHASE_PRICES: {
@@ -347,6 +367,16 @@ const GAME_CONSTANTS = {
     const dpsCut = this.MID_BOSS_BASE_DPS_CUT * (this.MID_BOSS_DPS_CUT_GROWTH ** normalizedLevel);
     return Number(dpsCut.toFixed(2));
   },
+
+  // 보스 스테이지별 DPM 컷
+  getBossDpmCut(stage) {
+    const normalizedStage = Math.max(0, Math.floor(Number(stage) || 0));
+    const fixedCuts = this.BOSS_STAGE_DPM_CUTS || [];
+    if (normalizedStage < fixedCuts.length) {
+      return Number(fixedCuts[normalizedStage]);
+    }
+    return null;
+  },
   
   // 누적 강화 필요 1단 유닛 계산
   getTier1CostToReach(targetTier) {
@@ -388,6 +418,14 @@ function initGameState() {
     midBoss: {
       level: 0,
       lastResult: null
+    },
+    boss: {
+      level: 0,
+      lastResult: null,
+      plus1EnhanceBonusRate: 0,
+      attackPowerBonusRate: 0,
+      expGainBonusRate: 0,
+      totalSellTicketFromBoss: 0
     },
     rebirth: {
       points: 0,
