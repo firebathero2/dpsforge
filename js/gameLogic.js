@@ -180,12 +180,16 @@ class GameEngine {
    * deltaTime: 경과 시간 (초)
    */
   tick(deltaTime = GAME_CONSTANTS.TICK_INTERVAL, realDeltaTime = deltaTime) {
-    // 1. 배치된 유닛으로부터 골드 생성
-    const currentDPS = GAME_CONSTANTS.getDPSFromDeployed(this.state.deployed);
-    const attackPowerMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade);
-    const multipliedDPS = currentDPS * attackPowerMultiplier;
-    const incomePerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(multipliedDPS);
+    // 1. 배치된 유닛으로부터 골드 생성 (액트 분리 수입)
+    const splitDps = this.getSplitDpsByAct();
+    const incomeAct1PerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(splitDps.act1);
+    const incomeAct2PerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(splitDps.act2) * GAME_CONSTANTS.ACT2_INCOME_MULTIPLIER;
+    const incomePerSecond = incomeAct1PerSecond + incomeAct2PerSecond;
     const goldGenerated = incomePerSecond * deltaTime;
+
+    if (!this.state.act2?.unlocked && splitDps.act2 > 0) {
+      this.state.act2.unlocked = true;
+    }
 
     // 초보자 튜토리얼 버프: 시작 후 2분간 초당 고정 골드 지급
     let tutorialBonusGold = 0;
@@ -208,7 +212,7 @@ class GameEngine {
     }
     
     this.state.gold += goldGenerated + tutorialBonusGold;
-    this.state.totalDamageDealt += multipliedDPS * deltaTime;
+    this.state.totalDamageDealt += (splitDps.act1 + splitDps.act2) * deltaTime;
     this.state.totalGoldEarned += goldGenerated + tutorialBonusGold;
     this.state.playTimeSeconds = (Number(this.state.playTimeSeconds) || 0) + realDeltaTime;
     this.state.totalPlayTimeSeconds = (Number(this.state.totalPlayTimeSeconds) || 0) + realDeltaTime;
@@ -218,12 +222,40 @@ class GameEngine {
   }
 
   /**
+   * 배치 유닛 DPS를 액트(1~25 / 26~최대)로 분리 계산
+   */
+  getSplitDpsByAct() {
+    const attackPowerMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade);
+    let act1RawDps = 0;
+    let act2RawDps = 0;
+
+    for (const [tierKey, count] of Object.entries(this.state.deployed || {})) {
+      const tier = Number.parseInt(tierKey, 10);
+      const normalizedCount = Number(count) || 0;
+      if (!Number.isFinite(tier) || normalizedCount <= 0) {
+        continue;
+      }
+
+      const unitDps = GAME_CONSTANTS.getDPS(tier) * normalizedCount;
+      if (tier >= GAME_CONSTANTS.ACT2_TIER_START) {
+        act2RawDps += unitDps;
+      } else {
+        act1RawDps += unitDps;
+      }
+    }
+
+    return {
+      act1: act1RawDps * attackPowerMultiplier,
+      act2: act2RawDps * attackPowerMultiplier
+    };
+  }
+
+  /**
    * 현재 사냥터 슬롯 한도 계산
-   * 기본 슬롯/보상 슬롯 + 특성 슬롯 보너스
+   * 기본 슬롯 + 중간보스 보상 슬롯
    */
   getCurrentSlotCap() {
-    const slotTraitLevel = this.state.traitLevels.slotCapacityUpgrade || 0;
-    return this.state.maxSlots + slotTraitLevel;
+    return this.state.maxSlots;
   }
 
   /**
@@ -611,7 +643,6 @@ class GameEngine {
    * 특성 리셋
     * traitType: GAME_CONSTANTS.TRAIT_SYSTEMS 키
    * 현재 레벨만큼 포인트 환불
-   * slotCapacityUpgrade 리셋 시 줄어드는 슬롯만큼 하위 유닛 자동 회수
    */
   resetTrait(traitType) {
     if (!GAME_CONSTANTS.TRAIT_SYSTEMS[traitType]) {
@@ -632,24 +663,6 @@ class GameEngine {
 
     const trait = GAME_CONSTANTS.TRAIT_SYSTEMS[traitType];
     const refundPoints = currentLevel * trait.cost;
-
-    // slotCapacityUpgrade 리셋 시, 줄어드는 슬롯 수만큼 하위 유닛 자동 회수
-    if (traitType === 'slotCapacityUpgrade') {
-      const deployedCount = this.getDeployedUnitCount();
-      const nextSlotCap = this.getCurrentSlotCap() - currentLevel;
-      const overflowCount = Math.max(0, deployedCount - nextSlotCap);
-      let slotsFreed = 0;
-
-      // 초과된 유닛만 1단부터 회수
-      for (let tier = 1; tier <= GAME_CONSTANTS.MAX_TIER && slotsFreed < overflowCount; tier++) {
-        const deployed = this.state.deployed[tier] || 0;
-        if (deployed > 0) {
-          const toRetrieve = Math.min(deployed, overflowCount - slotsFreed);
-          this.retrieveUnit(tier, toRetrieve);
-          slotsFreed += toRetrieve;
-        }
-      }
-    }
 
     const currentPoints = Math.max(0, Math.floor(Number(this.state.traitPoints) || 0));
     this.state.traitLevels[traitType] = 0;
@@ -841,10 +854,9 @@ class GameEngine {
   getOfflineReward(offlineSeconds) {
     // 최대 오프라인 시간 제한
     const cappedSeconds = Math.min(offlineSeconds, GAME_CONSTANTS.MAX_OFFLINE_TIME);
-    
-    // 마지막 저장 시점의 평균 DPS 기준으로 계산
-    const estimatedDPS = GAME_CONSTANTS.getDPSFromDeployed(this.state.deployed);
-    const estimatedIncomePerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(estimatedDPS);
+
+    // 현재 배치 상태를 기준으로 액트 분리 수입을 적용
+    const estimatedIncomePerSecond = this.getState().currentIncomePerSecond;
     const reward = estimatedIncomePerSecond * cappedSeconds * GAME_CONSTANTS.OFFLINE_REWARD_MULTIPLIER;
     
     return Math.floor(reward);
@@ -866,21 +878,26 @@ class GameEngine {
    * 게임 상태 스냅샷 반환
    */
   getState() {
-    const currentDPS = GAME_CONSTANTS.getDPSFromDeployed(this.state.deployed);
-    const attackPowerMultiplier = GAME_CONSTANTS.getAttackPowerMultiplier(this.state.traitLevels.attackPowerUpgrade);
-    const multipliedDPS = currentDPS * attackPowerMultiplier;
-    const currentIncomeMultiplier = GAME_CONSTANTS.getIncomeMultiplierFromDPS(multipliedDPS);
-    const currentIncomePerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(multipliedDPS);
-    const nextIncomeThreshold = GAME_CONSTANTS.getNextIncomeThreshold(multipliedDPS);
+    const splitDps = this.getSplitDpsByAct();
+    const totalDps = splitDps.act1 + splitDps.act2;
+    const currentIncomeMultiplier = GAME_CONSTANTS.getIncomeMultiplierFromDPS(splitDps.act1);
+    const incomeAct1PerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(splitDps.act1);
+    const incomeAct2PerSecond = GAME_CONSTANTS.getActualIncomePerSecondFromDPS(splitDps.act2) * GAME_CONSTANTS.ACT2_INCOME_MULTIPLIER;
+    const currentIncomePerSecond = incomeAct1PerSecond + incomeAct2PerSecond;
+    const nextIncomeThreshold = GAME_CONSTANTS.getNextIncomeThreshold(splitDps.act1);
     const requiredExpForNextLevel = this.state.characterLevel >= GAME_CONSTANTS.MAX_CHARACTER_LEVEL
       ? 0
       : GAME_CONSTANTS.getRequiredExpForLevel(this.state.characterLevel);
 
     return {
       ...this.state,
-      currentDPS: multipliedDPS,
+      currentDPS: totalDps,
+      currentDPSPrimary: splitDps.act1,
+      currentDPSSecondary: splitDps.act2,
       currentIncomeMultiplier,
       currentIncomePerSecond,
+      currentIncomePerSecondAct1: incomeAct1PerSecond,
+      currentIncomePerSecondAct2: incomeAct2PerSecond,
       nextIncomeThreshold,
       requiredExpForNextLevel,
       slotCap: this.getCurrentSlotCap(),
@@ -930,6 +947,8 @@ class GameEngine {
           autoUpgradeSpeedUpgrade,
           autoSellSpeedUpgrade,
           enhanceProbabilityUpgrade: legacyEnhanceProbabilityUpgrade,
+          automationSpeedUpgrade: removedAutomationSpeedUpgrade,
+          slotCapacityUpgrade: removedSlotCapacityUpgrade,
           ...restTraitLevels
         } = parsedTraitLevels;
         const legacyAutomationTotal = [
@@ -937,13 +956,15 @@ class GameEngine {
           autoUpgradeSpeedUpgrade,
           autoSellSpeedUpgrade
         ].reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
-        const rawAutomationLevel = Number.isFinite(restTraitLevels.automationSpeedUpgrade)
-          ? restTraitLevels.automationSpeedUpgrade
-          : legacyAutomationTotal;
-        const automationLevel = Math.min(
-          GAME_CONSTANTS.TRAIT_SYSTEMS.automationSpeedUpgrade.maxLevel,
-          Math.max(0, Math.floor(rawAutomationLevel || 0))
+        const removedAutomationLevel = Math.max(
+          0,
+          Math.floor(
+            Number.isFinite(removedAutomationSpeedUpgrade)
+              ? removedAutomationSpeedUpgrade
+              : legacyAutomationTotal
+          )
         );
+        const removedSlotLevel = Math.max(0, Math.floor(removedSlotCapacityUpgrade || 0));
         const legacyEnhanceLevel = Math.max(0, Math.floor(legacyEnhanceProbabilityUpgrade || 0));
         const enhancePlus1Level = Number.isFinite(restTraitLevels.enhanceProbabilityPlus1Upgrade)
           ? Math.max(0, Math.floor(restTraitLevels.enhanceProbabilityPlus1Upgrade || 0))
@@ -951,11 +972,11 @@ class GameEngine {
             GAME_CONSTANTS.TRAIT_SYSTEMS.enhanceProbabilityPlus1Upgrade.maxLevel,
             legacyEnhanceLevel
           );
-        const refundedAutomationPoints = Math.max(0, Math.floor(rawAutomationLevel || 0) - automationLevel);
+        const refundedRemovedTraitPoints = (removedAutomationLevel * 2) + (removedSlotLevel * 1);
         const mergedState = {
           ...initialState,
           ...parsedWithoutRebirth,
-          traitPoints: (Number.isFinite(parsedWithoutRebirth.traitPoints) ? parsedWithoutRebirth.traitPoints : initialState.traitPoints) + refundedAutomationPoints,
+          traitPoints: (Number.isFinite(parsedWithoutRebirth.traitPoints) ? parsedWithoutRebirth.traitPoints : initialState.traitPoints) + refundedRemovedTraitPoints,
           maxSlots: Number.isFinite(parsedWithoutRebirth.maxSlots) ? parsedWithoutRebirth.maxSlots : initialState.maxSlots,
           inventory: {
             ...initialState.inventory,
@@ -968,8 +989,7 @@ class GameEngine {
           traitLevels: {
             ...initialState.traitLevels,
             ...restTraitLevels,
-            enhanceProbabilityPlus1Upgrade: enhancePlus1Level,
-            automationSpeedUpgrade: automationLevel
+            enhanceProbabilityPlus1Upgrade: enhancePlus1Level
           },
           midBoss: {
             ...initialState.midBoss,

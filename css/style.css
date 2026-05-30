@@ -131,8 +131,39 @@ body::before {
   color: var(--warning-color);
 }
 
+.header .hud-dps .resource-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.header .hud-dps .dps-primary {
+  color: var(--warning-color);
+}
+
+.header .hud-dps .dps-secondary {
+  color: #22c55e;
+  font-size: 0.66em;
+  font-weight: 700;
+}
+
 .header .hud-gold .resource-value {
   color: var(--secondary-color);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.header .hud-gold .gold-primary {
+  color: var(--secondary-color);
+}
+
+.header .hud-gold .gold-income {
+  color: #86efac;
+  font-size: 0.66em;
+  font-weight: 700;
 }
 
 .header .resource-value {
@@ -140,23 +171,26 @@ body::before {
 }
 
 .resource-item-progress .resource-value-stack {
-  display: block;
-  width: 100%;
-  gap: 2px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  width: auto;
   line-height: 1.1;
-  white-space: normal;
+  white-space: nowrap;
+  flex-wrap: nowrap;
 }
 
 .resource-item-progress .progress-level {
-  display: block;
+  display: inline;
   font-size: 1em;
   font-weight: 700;
+  color: #67e8f9;
 }
 
 .resource-item-progress .progress-exp {
-  display: block;
-  font-size: 0.84em;
-  color: #cbd5e1;
+  display: inline;
+  font-size: 0.66em;
+  color: #a5b4fc;
 }
 
 .header h1 {
@@ -1001,6 +1035,17 @@ body::before {
   flex-wrap: wrap;
 }
 
+.rebirth-action-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rebirth-info-tooltip {
+  width: 17px;
+  height: 17px;
+}
+
 .unit-table tbody tr:hover {
   background-color: rgba(6, 182, 212, 0.12);
 }
@@ -1592,11 +1637,16 @@ body::before {
   }
 
   .resource-item-progress .progress-level {
-    font-size: 0.98em;
+    font-size: 1em;
   }
 
   .resource-item-progress .progress-exp {
-    font-size: 0.76em;
+    font-size: 0.62em;
+  }
+
+  .header .hud-dps .dps-secondary,
+  .header .hud-gold .gold-income {
+    font-size: 0.62em;
   }
 
   .section {

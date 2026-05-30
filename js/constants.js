@@ -6,6 +6,8 @@
 const GAME_CONSTANTS = {
   MAX_TIER: 40,
   MIN_SELL_TIER: 15,
+  ACT2_TIER_START: 26,
+  ACT2_INCOME_MULTIPLIER: 100000,
 
   // 기본 리소스
   STARTING_GOLD: 0,
@@ -238,18 +240,6 @@ const GAME_CONSTANTS = {
       cost: 200,
       maxLevel: 30,
       description: '+3강 강화확률 +0.1%p'
-    },
-    slotCapacityUpgrade: {
-      name: '사냥터 인원 증가',
-      cost: 1,
-      maxLevel: 20,
-      description: '사냥터 인원 +1'
-    },
-    automationSpeedUpgrade: {
-      name: '자동화 속도증가(구매, 강화, 판매)',
-      cost: 2,
-      maxLevel: 10,
-      description: '자동구매, 자동강화, 자동판매 속도 +5회/초'
     }
   },
 
@@ -272,11 +262,6 @@ const GAME_CONSTANTS = {
     if (tier <= 10) return 1.0;
     if (tier <= 20) return 0.9;
     return 0.8;
-  },
-
-  // 자동화 속도 계산 (기본 25회/초 + 업글 레벨당 5회/초)
-  getAutomationActionsPerSecond(upgradeLevel) {
-    return this.AUTO_BASE_ACTIONS_PER_SEC + (Math.max(0, Math.floor(upgradeLevel || 0)) * 5);
   },
 
   // DPS 계산 헬퍼 (공격력 × 회/초)
@@ -396,9 +381,7 @@ function initGameState() {
       attackPowerUpgrade: 0,
       enhanceProbabilityPlus1Upgrade: 0,
       enhanceProbabilityPlus2Upgrade: 0,
-      enhanceProbabilityPlus3Upgrade: 0,
-      slotCapacityUpgrade: 0,
-      automationSpeedUpgrade: 0
+      enhanceProbabilityPlus3Upgrade: 0
     },
     midBoss: {
       level: 0,
@@ -427,6 +410,10 @@ function initGameState() {
       beginnerBuffElapsedSec: 0,
       beginnerBuffDurationSec: GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_DURATION_SEC,
       beginnerBuffRatePerSec: GAME_CONSTANTS.TUTORIAL_BEGINNER_GOLD_RATE_PER_SEC
+    },
+    act2: {
+      unlocked: false,
+      noticeShown: false
     },
     lastTickTime: Date.now(),
     offlineGoldGenerated: 0

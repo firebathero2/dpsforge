@@ -965,10 +965,22 @@ class GameUI {
       if (tier >= GAME_CONSTANTS.MIN_SELL_TIER) {
         const sellExp = GAME_CONSTANTS.getSellExpByTier(tier);
         const firstRebirthAction = tier === 15
-          ? '<button type="button" class="btn-sm btn-rebirth-action" id="rebirth-first-button" title="조건 : 2레벨 달성&#10;보상 : 2배속 해금">1차 환생</button>'
+          ? `<span class="rebirth-action-wrap">
+              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-first-button" title="조건 : 2레벨 달성&#10;보상 : 2배속 해금">1차 환생</button>
+              <span class="price-tooltip rebirth-info-tooltip" tabindex="0" aria-label="1차 환생 안내">
+                !
+                <span class="price-tooltip-text">조건 : 2레벨 달성\n보상 : 2배속 해금</span>
+              </span>
+            </span>`
           : '';
         const secondRebirthAction = tier === 20
-          ? '<button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3배속 해금">2차 환생</button>'
+          ? `<span class="rebirth-action-wrap">
+              <button type="button" class="btn-sm btn-rebirth-action" id="rebirth-second-button" title="조건 : 20단 보유, 10레벨 달성&#10;보상 : 3배속 해금">2차 환생</button>
+              <span class="price-tooltip rebirth-info-tooltip" tabindex="0" aria-label="2차 환생 안내">
+                !
+                <span class="price-tooltip-text">선행 : 1차 환생 완료\n조건 : 20단 보유, 10레벨 달성\n보상 : 3배속 해금</span>
+              </span>
+            </span>`
           : '';
         sellCell = `
           <div class="sell-actions">
@@ -1019,9 +1031,7 @@ class GameUI {
       { elementId: 'trait-attack-cost', traitType: 'attackPowerUpgrade' },
       { elementId: 'trait-enhance-plus1-cost', traitType: 'enhanceProbabilityPlus1Upgrade' },
       { elementId: 'trait-enhance-plus2-cost', traitType: 'enhanceProbabilityPlus2Upgrade' },
-      { elementId: 'trait-enhance-plus3-cost', traitType: 'enhanceProbabilityPlus3Upgrade' },
-      { elementId: 'trait-slot-cost', traitType: 'slotCapacityUpgrade' },
-      { elementId: 'trait-automation-speed-cost', traitType: 'automationSpeedUpgrade' }
+      { elementId: 'trait-enhance-plus3-cost', traitType: 'enhanceProbabilityPlus3Upgrade' }
     ];
 
     for (const binding of costBindings) {
@@ -1112,12 +1122,11 @@ class GameUI {
   }
 
   /**
-   * 특성 레벨에 따라 자동화 간격 동기화
+   * 자동화 간격 동기화
    */
   syncAutomationIntervals() {
-    const traitLevels = gameEngine.state.traitLevels || {};
     const automationStartPassLevel = Math.max(0, Math.floor(gameEngine.state.rebirth?.rewards?.automationStartPass || 0));
-    const automationRate = GAME_CONSTANTS.getAutomationActionsPerSecond(traitLevels.automationSpeedUpgrade || 0)
+    const automationRate = GAME_CONSTANTS.AUTO_BASE_ACTIONS_PER_SEC
       + (automationStartPassLevel * 10);
 
     this.autoBuyIntervalSec = 1 / automationRate;
@@ -1224,8 +1233,44 @@ class GameUI {
   updateResourceDisplay() {
     const state = gameEngine.getState();
 
-    this.updateHudValue('gold-display', this.formatAbcNumber(state.gold));
-    this.updateHudValue('dps-display', this.formatAbcNumber(state.currentDPS));
+    if (state.act2?.unlocked && !state.act2?.noticeShown) {
+      gameEngine.state.act2.noticeShown = true;
+      alert('새로운 액트가 열렸습니다!\n26단 이상 유닛은 독립 수입 배율(1배 시작)과 100000배 수입 규칙이 적용됩니다.');
+    }
+
+    const goldDisplayEl = document.getElementById('gold-display');
+    if (goldDisplayEl) {
+      const goldText = this.formatAbcNumber(state.gold);
+      const incomeText = this.formatAbcNumber(state.currentIncomePerSecond, { smallAsInteger: false });
+      const nextGoldRaw = `${goldText}|${incomeText}`;
+      const previousGoldRaw = goldDisplayEl.dataset.lastValue;
+
+      goldDisplayEl.innerHTML = `<span class="gold-primary">${goldText}</span><span class="gold-income">(+${incomeText}/s)</span>`;
+
+      if (previousGoldRaw !== undefined && previousGoldRaw !== nextGoldRaw) {
+        this.flashHudValue(goldDisplayEl);
+      }
+      goldDisplayEl.dataset.lastValue = nextGoldRaw;
+    }
+
+    const dpsDisplayEl = document.getElementById('dps-display');
+    if (dpsDisplayEl) {
+      const primaryDpsText = this.formatAbcNumber(state.currentDPSPrimary || 0);
+      const secondaryDpsValue = Math.max(0, Number(state.currentDPSSecondary) || 0);
+      const secondaryDpsText = this.formatAbcNumber(secondaryDpsValue);
+      const nextDpsRaw = secondaryDpsValue > 0 ? `${primaryDpsText}|${secondaryDpsText}` : primaryDpsText;
+      const previousDpsRaw = dpsDisplayEl.dataset.lastValue;
+
+      dpsDisplayEl.innerHTML = secondaryDpsValue > 0
+        ? `<span class="dps-primary">${primaryDpsText}</span><span class="dps-secondary">2nd ${secondaryDpsText}</span>`
+        : `<span class="dps-primary">${primaryDpsText}</span>`;
+
+      if (previousDpsRaw !== undefined && previousDpsRaw !== nextDpsRaw) {
+        this.flashHudValue(dpsDisplayEl);
+      }
+      dpsDisplayEl.dataset.lastValue = nextDpsRaw;
+    }
+
     this.emitHudGainFx('gold', state.gold, 'fx-gold');
     this.emitHudGainFx('dps', state.currentDPS, 'fx-boss');
     
@@ -1255,7 +1300,7 @@ class GameUI {
 
     const characterProgressEl = document.getElementById('character-progress');
     if (characterProgressEl) {
-      const levelText = this.formatAbcNumber(state.characterLevel);
+      const levelText = `Lv ${this.formatAbcNumber(state.characterLevel)}`;
       const expText = state.requiredExpForNextLevel === 0
         ? '(MAX)'
         : `(${this.formatAbcNumber(state.characterExp)} / ${this.formatAbcNumber(state.requiredExpForNextLevel)})`;
@@ -1273,9 +1318,8 @@ class GameUI {
     this.updateHudValue('trait-points', state.traitPoints);
     this.updateHudValue('midboss-level', state.midBoss?.level || 0);
     this.updateHudValue('slot-population', `${state.deployedCount} / ${state.slotCap}`);
-    const automationSpeedLevel = state.traitLevels.automationSpeedUpgrade || 0;
     const automationStartPassLevel = Math.max(0, Math.floor(state.rebirth?.rewards?.automationStartPass || 0));
-    const automationSpeedRate = GAME_CONSTANTS.getAutomationActionsPerSecond(automationSpeedLevel)
+    const automationSpeedRate = GAME_CONSTANTS.AUTO_BASE_ACTIONS_PER_SEC
       + (automationStartPassLevel * 10);
     this.updateHudValue('status-automation-rate', `각 ${automationSpeedRate}회/초`);
     this.updateHudValue('play-time', this.formatDuration(state.playTimeSeconds || 0));
@@ -1331,26 +1375,6 @@ class GameUI {
       }
     }
 
-    // 사냥터 인원 증가 특성 정보 표시
-    const slotLevel = state.traitLevels.slotCapacityUpgrade || 0;
-    const slotLevelEl = document.getElementById('trait-slot-level');
-    const slotEffectEl = document.getElementById('trait-slot-effect');
-    if (slotLevelEl) slotLevelEl.textContent = this.formatTraitLevel('slotCapacityUpgrade', slotLevel);
-    if (slotEffectEl) {
-      const slotMax = GAME_CONSTANTS.TRAIT_SYSTEMS.slotCapacityUpgrade?.maxLevel || 0;
-      const slotPreviewText = slotLevel >= slotMax ? '' : '(+1칸)';
-      this.setTraitEffectText(slotEffectEl, `+${slotLevel}칸 (총 ${state.slotCap}칸)`, slotPreviewText);
-    }
-
-    // 자동화 속도 특성 정보 표시
-    const automationSpeedLevelEl = document.getElementById('trait-automation-speed-level');
-    const automationSpeedEffectEl = document.getElementById('trait-automation-speed-effect');
-    if (automationSpeedLevelEl) automationSpeedLevelEl.textContent = this.formatTraitLevel('automationSpeedUpgrade', automationSpeedLevel);
-    if (automationSpeedEffectEl) {
-      const automationSpeedMax = GAME_CONSTANTS.TRAIT_SYSTEMS.automationSpeedUpgrade?.maxLevel || 0;
-      const automationSpeedPreviewText = automationSpeedLevel >= automationSpeedMax ? '' : '(+5회/초)';
-      this.setTraitEffectText(automationSpeedEffectEl, `속도: 구매/강화/판매 각 ${automationSpeedRate}회/초`, automationSpeedPreviewText);
-    }
   }
 
   /**
@@ -2327,26 +2351,6 @@ class GameUI {
     const resetEnhancePlus3Btn = document.getElementById('reset-enhance-probability-plus3');
     if (resetEnhancePlus3Btn) {
       resetEnhancePlus3Btn.addEventListener('click', () => this.onResetTrait('enhanceProbabilityPlus3Upgrade'));
-    }
-
-    const upgradeSlotBtn = document.getElementById('upgrade-slot-capacity');
-    if (upgradeSlotBtn) {
-      upgradeSlotBtn.addEventListener('click', () => this.onUpgradeTrait('slotCapacityUpgrade'));
-    }
-
-    const resetSlotBtn = document.getElementById('reset-slot-capacity');
-    if (resetSlotBtn) {
-      resetSlotBtn.addEventListener('click', () => this.onResetTrait('slotCapacityUpgrade'));
-    }
-
-    const upgradeAutomationSpeedBtn = document.getElementById('upgrade-automation-speed');
-    if (upgradeAutomationSpeedBtn) {
-      upgradeAutomationSpeedBtn.addEventListener('click', () => this.onUpgradeTrait('automationSpeedUpgrade'));
-    }
-
-    const resetAutomationSpeedBtn = document.getElementById('reset-automation-speed');
-    if (resetAutomationSpeedBtn) {
-      resetAutomationSpeedBtn.addEventListener('click', () => this.onResetTrait('automationSpeedUpgrade'));
     }
 
     const traitPresetButtons = document.querySelectorAll('[data-trait-preset]');
