@@ -124,7 +124,7 @@ body::before {
 
 .header .hud-gold .resource-label::before {
   content: '◈ ';
-  color: var(--secondary-color);
+  color: #67e8f9;
 }
 
 .header .hud-dps .resource-value {
@@ -144,6 +144,12 @@ body::before {
 
 .header .hud-dps .dps-secondary {
   color: #22c55e;
+  font-size: 1em;
+  font-weight: 700;
+}
+
+.header .hud-dps .dps-separator {
+  color: #93c5fd;
   font-size: 0.66em;
   font-weight: 700;
 }
@@ -157,13 +163,15 @@ body::before {
 }
 
 .header .hud-gold .gold-primary {
-  color: var(--secondary-color);
+  color: #67e8f9;
+  text-shadow: 0 0 10px rgba(103, 232, 249, 0.24);
 }
 
 .header .hud-gold .gold-income {
-  color: #86efac;
+  color: #bbf7d0;
   font-size: 0.66em;
   font-weight: 700;
+  text-shadow: 0 0 8px rgba(187, 247, 208, 0.22);
 }
 
 .header .resource-value {
@@ -1644,9 +1652,12 @@ body::before {
     font-size: 0.62em;
   }
 
-  .header .hud-dps .dps-secondary,
   .header .hud-gold .gold-income {
     font-size: 0.62em;
+  }
+
+  .header .hud-dps .dps-secondary {
+    font-size: 1em;
   }
 
   .section {

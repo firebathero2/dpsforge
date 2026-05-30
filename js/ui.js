@@ -660,13 +660,21 @@ class GameUI {
     const currentState = state || gameEngine.getState();
     const firstBtn = document.getElementById('rebirth-first-button');
     const secondBtn = document.getElementById('rebirth-second-button');
+    const firstWrap = firstBtn ? firstBtn.closest('.rebirth-action-wrap') : null;
+    const secondWrap = secondBtn ? secondBtn.closest('.rebirth-action-wrap') : null;
 
     if (firstBtn) {
       firstBtn.title = '조건 : 2레벨 달성\n보상 : 2배속 해금';
       if (this.firstRebirthCompleted) {
         firstBtn.hidden = true;
+        if (firstWrap) {
+          firstWrap.hidden = true;
+        }
       } else {
         firstBtn.hidden = false;
+        if (firstWrap) {
+          firstWrap.hidden = false;
+        }
         firstBtn.disabled = !this.canPerformFirstRebirth(currentState);
       }
     }
@@ -677,8 +685,14 @@ class GameUI {
         : '선행 조건 : 1차 환생 완료';
       if (this.secondRebirthCompleted) {
         secondBtn.hidden = true;
+        if (secondWrap) {
+          secondWrap.hidden = true;
+        }
       } else {
         secondBtn.hidden = false;
+        if (secondWrap) {
+          secondWrap.hidden = false;
+        }
         secondBtn.disabled = !this.canPerformSecondRebirth(currentState);
         secondBtn.textContent = '2차 환생';
       }
@@ -1243,27 +1257,29 @@ class GameUI {
       const goldText = this.formatAbcNumber(state.gold);
       const incomeText = this.formatAbcNumber(state.currentIncomePerSecond, { smallAsInteger: false });
       const nextGoldRaw = `${goldText}|${incomeText}`;
-      const previousGoldRaw = goldDisplayEl.dataset.lastValue;
 
       goldDisplayEl.innerHTML = `<span class="gold-primary">${goldText}</span><span class="gold-income">(+${incomeText}/s)</span>`;
-
-      if (previousGoldRaw !== undefined && previousGoldRaw !== nextGoldRaw) {
-        this.flashHudValue(goldDisplayEl);
-      }
       goldDisplayEl.dataset.lastValue = nextGoldRaw;
     }
 
     const dpsDisplayEl = document.getElementById('dps-display');
     if (dpsDisplayEl) {
-      const primaryDpsText = this.formatAbcNumber(state.currentDPSPrimary || 0);
+      const primaryDpsValue = Math.max(0, Number(state.currentDPSPrimary) || 0);
+      const primaryDpsText = this.formatAbcNumber(primaryDpsValue);
       const secondaryDpsValue = Math.max(0, Number(state.currentDPSSecondary) || 0);
       const secondaryDpsText = this.formatAbcNumber(secondaryDpsValue);
-      const nextDpsRaw = secondaryDpsValue > 0 ? `${primaryDpsText}|${secondaryDpsText}` : primaryDpsText;
+      const showPrimary = primaryDpsValue > 0 || secondaryDpsValue <= 0;
+      const showSecondary = secondaryDpsValue > 0;
+      const nextDpsRaw = `${showPrimary ? primaryDpsText : ''}|${showSecondary ? secondaryDpsText : ''}`;
       const previousDpsRaw = dpsDisplayEl.dataset.lastValue;
 
-      dpsDisplayEl.innerHTML = secondaryDpsValue > 0
-        ? `<span class="dps-primary">${primaryDpsText}</span><span class="dps-secondary">2nd ${secondaryDpsText}</span>`
-        : `<span class="dps-primary">${primaryDpsText}</span>`;
+      if (showPrimary && showSecondary) {
+        dpsDisplayEl.innerHTML = `<span class="dps-primary">${primaryDpsText}</span><span class="dps-separator">/</span><span class="dps-secondary">${secondaryDpsText}</span>`;
+      } else if (showSecondary) {
+        dpsDisplayEl.innerHTML = `<span class="dps-secondary">${secondaryDpsText}</span>`;
+      } else {
+        dpsDisplayEl.innerHTML = `<span class="dps-primary">${primaryDpsText}</span>`;
+      }
 
       if (previousDpsRaw !== undefined && previousDpsRaw !== nextDpsRaw) {
         this.flashHudValue(dpsDisplayEl);
@@ -1271,7 +1287,6 @@ class GameUI {
       dpsDisplayEl.dataset.lastValue = nextDpsRaw;
     }
 
-    this.emitHudGainFx('gold', state.gold, 'fx-gold');
     this.emitHudGainFx('dps', state.currentDPS, 'fx-boss');
     
     // 수입 배율
